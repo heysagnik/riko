@@ -255,11 +255,15 @@ export function CaseListPage() {
         <p className="text-caption tabular-nums text-ink-faint">{total} {total === 1 ? "case" : "cases"}</p>
       </div>
 
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-b border-line">
-        <Tabs value={filter} onValueChange={(value) => updateFilters({ state: value })}>
-          <TabsList className="border-b-0">
+      <div className="mt-5 flex flex-col gap-3 border-b border-line sm:flex-row sm:items-center sm:justify-between">
+        <Tabs value={filter} onValueChange={(value) => updateFilters({ state: value })} className="min-w-0">
+          <TabsList className="w-full flex-nowrap overflow-x-auto border-b-0 sm:w-auto">
             {STATUS_OPTIONS.map((option) => (
-              <TabsTrigger key={option.value} value={option.value} className="inline-flex items-center gap-1.5">
+              <TabsTrigger
+                key={option.value}
+                value={option.value}
+                className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap"
+              >
                 {option.label}
                 {counts[option.value] !== undefined ? (
                   <span
@@ -282,7 +286,7 @@ export function CaseListPage() {
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="mb-2 flex h-8 items-center gap-1.5 rounded-md border border-line-strong bg-surface px-2.5 text-sm text-ink-muted outline-none transition-colors hover:border-accent hover:text-ink focus-visible:border-accent"
+              className="mb-2 flex h-8 shrink-0 items-center gap-1.5 self-start rounded-md border border-line-strong bg-surface px-2.5 text-sm text-ink-muted outline-none transition-colors hover:border-accent hover:text-ink focus-visible:border-accent sm:self-auto"
             >
               {DATE_OPTIONS.find((option) => option.value === range)?.label ?? "Any time"}
               <CaretDownIcon size={12} weight="bold" className="text-ink-faint" />
