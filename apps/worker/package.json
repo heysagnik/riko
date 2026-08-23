@@ -17,7 +17,7 @@
     "@riko/db": "workspace:*",
     "@riko/shared": "workspace:*",
     "drizzle-orm": "^0.45.2",
-    "nodemailer": "^6.9.16",
+    "nodemailer": "^9.0.1",
     "tsx": "^4.19.0"
   },
   "devDependencies": {
