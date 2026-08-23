@@ -1,0 +1,22 @@
+{
+  "name": "riko",
+  "private": true,
+  "version": "0.0.1",
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@9.15.1",
+  "scripts": {
+    "build": "pnpm -r --if-present run build",
+    "dev": "pnpm -r --parallel --if-present run dev",
+    "typecheck": "pnpm -r --if-present run typecheck",
+    "lint": "pnpm -r --if-present run lint",
+    "test": "pnpm -r --if-present run test",
+    "db:generate": "pnpm --filter @riko/db run db:generate",
+    "db:migrate": "pnpm --filter @riko/db run db:migrate"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@cloudflare/workers-types": "^4.20250109.0"
+  }
+}

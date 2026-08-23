@@ -1,0 +1,1 @@
+ALTER TABLE "payments" ADD COLUMN "failure_recoverable" boolean DEFAULT false NOT NULL;

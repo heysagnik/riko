@@ -1,0 +1,125 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1787263087133,
+      "tag": "0000_breezy_zuras",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1787263659955,
+      "tag": "0001_clean_hellfire_club",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787263700000,
+      "tag": "0002_rls",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1787263700001,
+      "tag": "0003_failure_code_map_seed",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1787361699841,
+      "tag": "0004_silky_kree",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1787361699842,
+      "tag": "0005_razorpay_failure_codes",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787366749520,
+      "tag": "0006_puzzling_firestar",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1787368962181,
+      "tag": "0007_sudden_texas_twister",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1787370007531,
+      "tag": "0008_classy_snowbird",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1787415323675,
+      "tag": "0009_minor_mojo",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1787431614187,
+      "tag": "0010_outstanding_ma_gnuci",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1787482927642,
+      "tag": "0011_legal_pestilence",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1787483994117,
+      "tag": "0012_exposures",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1787484021583,
+      "tag": "0013_cases_on_exposures",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1787484487325,
+      "tag": "0014_case_rung",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1787485333410,
+      "tag": "0015_promises",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1787485892614,
+      "tag": "0016_suppression",
+      "breakpoints": true
+    }
+  ]
+}

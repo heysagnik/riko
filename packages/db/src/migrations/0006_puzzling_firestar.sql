@@ -1,0 +1,1 @@
+ALTER TABLE "sender_identities" ADD COLUMN "brand_template_html" text;

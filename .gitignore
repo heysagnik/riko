@@ -1,0 +1,22 @@
+node_modules/
+dist/
+.env
+.env.local
+*.log
+.turbo/
+.DS_Store
+
+# Build artifacts left behind by local tsc/wrangler runs
+*.tsbuildinfo
+.wrangler/
+
+# Ad hoc DB-inspection scripts (peek-*, check-*, verify-*, wait-*) — useful
+# locally while debugging, not meant to ship. backfill-audit-chain.ts is the
+# one script in this directory that's real tooling, so it stays tracked.
+packages/db/scripts/peek-*.ts
+packages/db/scripts/check-*.ts
+packages/db/scripts/verify-*.ts
+packages/db/scripts/wait-*.ts
+
+# One-off local script that decrypts values straight out of .env
+scripts/test-smtp-send.mjs

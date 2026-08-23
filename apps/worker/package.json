@@ -1,0 +1,32 @@
+{
+  "name": "@riko/worker",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file=../../.env src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node --env-file=../../.env dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "start:prod": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@ai-sdk/openai-compatible": "^3",
+    "@riko/agent": "workspace:*",
+    "@riko/core": "workspace:*",
+    "@riko/db": "workspace:*",
+    "@riko/shared": "workspace:*",
+    "drizzle-orm": "^0.45.2",
+    "nodemailer": "^6.9.16",
+    "tsx": "^4.19.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/nodemailer": "^6.4.17",
+    "typescript": "^5.7.0"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./run": "./src/run.ts"
+  }
+}

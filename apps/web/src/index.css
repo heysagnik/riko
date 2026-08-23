@@ -1,0 +1,119 @@
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/plus-jakarta-sans";
+@import "@fontsource/instrument-serif";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --ink: 0 0% 9%;
+    --ink-secondary: 0 0% 25%;
+    --ink-muted: 0 0% 45%;
+    --ink-faint: 0 0% 60%;
+    --surface: 0 0% 100%;
+    --surface-sunk: 0 0% 98%;
+    --surface-cream: 0 0% 96%;
+    --line: 0 0% 91%;
+    --line-strong: 0 0% 80%;
+
+    --accent: 0 0% 9%;
+    --accent-hover: 0 0% 20%;
+    --accent-press: 0 0% 15%;
+    --accent-soft: 0 0% 94%;
+    --accent-foreground: 0 0% 100%;
+
+    --brand-dark: 0 0% 9%;
+
+    --recovered: 142 71% 40%;
+    --waiting: 38 92% 45%;
+    --lost: 0 72% 48%;
+    --skipped: 0 0% 45%;
+  }
+
+  :root[data-theme="dark"] {
+    --ink: 0 0% 95%;
+    --ink-secondary: 0 0% 80%;
+    --ink-muted: 0 0% 65%;
+    --ink-faint: 0 0% 45%;
+    --surface: 0 0% 3%;
+    --surface-sunk: 0 0% 8%;
+    --surface-cream: 0 0% 10%;
+    --line: 0 0% 16%;
+    --line-strong: 0 0% 28%;
+
+    --accent: 0 0% 92%;
+    --accent-hover: 0 0% 85%;
+    --accent-press: 0 0% 75%;
+    --accent-soft: 0 0% 18%;
+    --accent-foreground: 0 0% 9%;
+
+    --brand-dark: 0 0% 9%;
+
+    --recovered: 142 65% 50%;
+    --waiting: 38 92% 58%;
+    --lost: 0 72% 58%;
+    --skipped: 0 0% 65%;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]):not([data-theme="dark"]) {
+      --ink: 0 0% 95%;
+      --ink-secondary: 0 0% 80%;
+      --ink-muted: 0 0% 65%;
+      --ink-faint: 0 0% 45%;
+      --surface: 0 0% 3%;
+      --surface-sunk: 0 0% 8%;
+      --surface-cream: 0 0% 10%;
+      --line: 0 0% 16%;
+      --line-strong: 0 0% 28%;
+
+      --accent: 0 0% 92%;
+      --accent-hover: 0 0% 85%;
+      --accent-press: 0 0% 75%;
+      --accent-soft: 0 0% 18%;
+      --accent-foreground: 0 0% 9%;
+
+      --brand-dark: 0 0% 9%;
+
+      --recovered: 142 65% 50%;
+      --waiting: 38 92% 58%;
+      --lost: 0 72% 58%;
+      --skipped: 0 0% 65%;
+    }
+  }
+
+  * {
+    @apply border-line;
+  }
+
+  body {
+    @apply bg-surface text-ink antialiased font-sans;
+    font-feature-settings: "ss01" 1;
+  }
+
+  .tabular-nums,
+  .font-tabular {
+    font-feature-settings: "tnum" 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--accent));
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

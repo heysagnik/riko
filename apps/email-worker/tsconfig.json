@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // DOM supplies Request/Response/Headers/ReadableStream. Pulling
+    // @cloudflare/workers-types instead makes pnpm resolve a second copy of
+    // drizzle-orm, which breaks type identity across the whole monorepo.
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": [],
+    "moduleResolution": "bundler",
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts"]
+}

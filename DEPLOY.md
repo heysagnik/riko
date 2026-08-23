@@ -1,0 +1,370 @@
+# Deploying Riko
+
+This is a full walkthrough, not a reference card. Follow it top to bottom on a
+fresh checkout and you end with a public URL, a working Razorpay webhook, and
+real two-way email.
+
+## Architecture
+
+Two deployable things, nothing else:
+
+```
+┌─────────────────────────────────────────────┐      ┌──────────────────────┐
+│  Render — one free web service               │      │  Cloudflare Worker   │
+│                                               │      │  (email only)        │
+│  Express serves:                             │      │                      │
+│    /              → dashboard (apps/web/dist)│◄─────┤  parses inbound mail │
+│    /api/*         → API routes               │ POST │  posts to /inbound/  │
+│    /webhooks/*    → Razorpay, Stripe          │      │       mail           │
+│    /inbound/mail  → replies from Cloudflare  │      └──────────────────────┘
+│                                               │
+│  In the same process, an async loop:         │
+│    processCircuitBreaker → processExposure-  │
+│    Sweep → processPromises → processNewCases │
+│    → processDraftingCases → processSending-  │
+│    Cases, every WORKER_POLL_MS (default 15s) │
+└───────────────┬───────────────────────────────┘
+                │
+                ▼
+        ┌───────────────┐
+        │  Neon Postgres │
+        └───────────────┘
+```
+
+**Why one process.** Render's free tier is web-services-only — a background
+worker is a paid product there. Running the poll loop inside the same Node
+process as the API means the whole system, including the agent pipeline, costs
+nothing. `RUN_WORKER=1` is what turns this on; see `apps/api/src/server.ts`.
+
+**Why Cloudflare only handles email.** Cloudflare Workers can't run this stack
+without a rewrite: no persistent process (the poll loop needs one), and the
+Postgres client here uses TCP transactions for row-level-security scoping,
+which Workers can't open. Its Email Routing product, though, is the only free
+way to receive mail on a custom domain and hand it to code — so that's the one
+piece that lives there.
+
+## Prerequisites
+
+- A GitHub account (Render deploys from a repo)
+- A [Neon](https://neon.tech) Postgres database (free tier)
+- A [Render](https://render.com) account (free tier)
+- A domain added to Cloudflare, with Email Routing available (only needed for
+  two-way email — skip section 7 without it)
+- An NVIDIA NIM API key (free tier) for the drafting model
+- A Razorpay account in test mode
+
+## 1. Generate the secrets you'll need
+
+Two values must be generated once and then never change, because existing
+encrypted data depends on them:
+
+```bash
+# APP_ENCRYPTION_KEY — AES-256-GCM key for connection secrets and PII.
+# Rotating this after cases exist makes existing customer emails undecryptable.
+openssl rand -hex 32
+
+# BETTER_AUTH_SECRET — signs session tokens. Rotating logs everyone out.
+openssl rand -hex 32
+```
+
+Save both somewhere durable (a password manager, not just this terminal) —
+you'll paste them into Render once and reuse them for every future redeploy.
+
+Generate one more for inbound mail authentication:
+
+```bash
+# INBOUND_MAIL_SECRET — shared secret between the Cloudflare Worker and this API.
+openssl rand -hex 24
+```
+
+## 2. Create the Neon database
+
+1. [neon.tech](https://neon.tech) → New Project → any region close to you
+2. Copy the connection string from the dashboard. It looks like:
+   ```
+   postgresql://user:password@ep-xxxx.region.aws.neon.tech/dbname?sslmode=require
+   ```
+3. Keep this tab open — you'll paste it into Render in step 4.
+
+Nothing needs to be run against it yet. The Render build step applies every
+migration in `packages/db/src/migrations` on each deploy.
+
+## 3. Push the repo to GitHub
+
+Render deploys from a branch. Check whether this repo has any commits first —
+if `git log` is empty, this is the first one:
+
+```bash
+git status
+git add -A
+git commit -m "Riko"
+gh repo create riko --private --source=. --push
+```
+
+If you already have commits and a remote, just push:
+
+```bash
+git push origin master
+```
+
+## 4. Create the Render service
+
+1. [dashboard.render.com](https://dashboard.render.com) → **New** → **Blueprint**
+2. Connect the GitHub repo. Render reads `render.yaml` at the root and
+   proposes one service named `riko` — a free web service in Singapore.
+3. Before clicking **Apply**, Render will prompt for every environment
+   variable marked `sync: false` in `render.yaml`. Fill in what you have so
+   far and leave `BETTER_AUTH_URL` / `APP_BASE_URL` blank for now:
+
+| Variable | Where it comes from |
+|---|---|
+| `DATABASE_URL` | The Neon connection string from step 2 |
+| `APP_ENCRYPTION_KEY` | Generated in step 1 |
+| `BETTER_AUTH_SECRET` | Generated in step 1 |
+| `NVIDIA_API_KEY` | [build.nvidia.com](https://build.nvidia.com) → API key |
+| `INBOUND_MAIL_SECRET` | Generated in step 1 |
+| `BETTER_AUTH_URL` | Leave blank, fill in step 5 |
+| `APP_BASE_URL` | Leave blank, fill in step 5 |
+
+4. Click **Apply**. Render clones the repo and runs the build command:
+   ```
+   corepack enable && pnpm install --frozen-lockfile && pnpm --filter @riko/web build && pnpm --filter @riko/db exec tsx src/migrate.ts
+   ```
+   This installs the whole workspace, builds the dashboard's static assets,
+   then applies every pending migration against `DATABASE_URL`. Expect this
+   first build to take 3–5 minutes.
+5. Once live, Render assigns a URL like `https://riko-a1b2.onrender.com`.
+   **The first deploy will not work yet** — continue to step 5 before testing.
+
+## 5. Close the URL loop
+
+`BETTER_AUTH_URL` and `APP_BASE_URL` both need the service's own URL, which
+only exists after the first deploy. This is expected, not a bug:
+
+1. Copy the URL Render assigned (Dashboard → your service → the URL at the top)
+2. Service → **Environment** → set:
+   - `BETTER_AUTH_URL` = `https://riko-a1b2.onrender.com` (no trailing slash)
+   - `APP_BASE_URL` = the same value
+3. Save. Render redeploys automatically — this run is fast, since it reuses
+   the build cache and only restarts the process.
+
+Sign-in will 500 with a cryptic better-auth error until this step is done,
+because `auth.ts` calls `requireEnv("BETTER_AUTH_URL")` at startup.
+
+## 6. Verify the deploy
+
+```bash
+curl https://riko-a1b2.onrender.com/health
+# {"ok":true,"at":"..."}
+```
+
+Open the service **Logs** tab and confirm all three lines appear on boot:
+
+```
+serving web from /opt/render/project/src/apps/web/dist
+api listening on 10000
+worker polling every 15000ms
+```
+
+If the third line is missing, `RUN_WORKER` isn't set to `1` in the
+environment — check the Environment tab. Without it, cases will sit in `NEW`
+forever; nothing is actually broken, the loop that moves them just never
+starts.
+
+Then open `https://riko-a1b2.onrender.com` in a browser, sign up, and create
+an organization. This is the tenant everything else attaches to.
+
+## 7. Keep the free service awake
+
+A free Render web service sleeps after 15 minutes of no HTTP traffic and takes
+roughly 50 seconds to wake on the next request. Two consequences:
+
+- A Razorpay webhook that arrives while asleep may time out before the service
+  wakes, and Razorpay's retry window is short. **This will silently lose a
+  demo** if you don't account for it.
+- The dashboard itself will feel broken on first load after idle.
+
+Fix it with any free scheduler hitting `/health` every 10 minutes:
+
+- [cron-job.org](https://cron-job.org) — free account, one job, no code
+- Or a second, tiny Cloudflare Worker on a Cron Trigger:
+  ```js
+  export default {
+    async scheduled(_event, env) {
+      await fetch("https://riko-a1b2.onrender.com/health");
+    },
+  };
+  ```
+
+Do this **before** connecting Razorpay, or your first test webhook is the one
+that gets lost to a cold start.
+
+## 8. Connect Razorpay
+
+Two separate things need doing: telling Riko about your Razorpay account, and
+telling Razorpay about Riko's webhook URL. The order matters — Riko needs to
+exist first, because the webhook secret it generates has to match what you
+type into Razorpay.
+
+**8a. Add the connection in Riko.** Dashboard → Connections → Connect Razorpay.
+This calls `POST /api/connections/razorpay`, which encrypts and stores your
+key ID, key secret, and a webhook secret you choose — nothing round-trips to
+Razorpay for verification the way the Stripe connection does.
+
+**8b. Register the webhook in Razorpay.** Dashboard → Settings → Webhooks →
+Add New Webhook:
+
+| Field | Value |
+|---|---|
+| Webhook URL | `https://riko-a1b2.onrender.com/webhooks/razorpay` |
+| Secret | **Byte-identical** to what you entered in step 8a |
+| Active events | `payment.failed`, `payment.captured`, `order.created`, `invoice.issued`, `invoice.paid` |
+
+The secret mismatch is the single most common failure here: `verifyWebhook` in
+`packages/core/src/providers/razorpay.ts` does an HMAC-SHA256 comparison, and
+any difference — including trailing whitespace pasted from a password manager
+— fails closed with a 400 and no case is created. If webhooks return 400,
+recheck the secret character-for-character before anything else.
+
+**8c. Test it.** From your machine, with `.env` pointed at production:
+
+```bash
+cd apps/api
+API_BASE_URL=https://riko-a1b2.onrender.com \
+  pnpm exec tsx --env-file=../../.env scripts/send-real-razorpay-webhook.ts
+```
+
+Expect `HTTP 200 {"status":"processed","caseId":"..."}`. Watch the case move
+through the dashboard: `NEW → DRAFTING → SENDING → WAITING`, roughly 15–30
+seconds end to end at the default poll interval.
+
+## 9. Set up sender identity (SMTP)
+
+Recovery emails send through whatever SMTP credentials you configure in
+Settings → Sender Identity — Resend, Gmail with an app password, or any SMTP
+provider works, since `apps/worker/src/lib/mailer.ts` is a plain nodemailer
+transport. Without this configured, `evaluateGates` rejects every case with
+`no_verified_sender` and nothing sends, by design — Riko will not draft mail
+it cannot deliver.
+
+Set a real **Reply-To** here too; this is the address `taggedReplyTo` appends
+`+<case-id>` to before every send, which is how section 10 routes replies back
+to the right case.
+
+## 10. Inbound email (Cloudflare Worker)
+
+Optional, but required for the promise-to-pay and reply-classification loop to
+work with real customers instead of the simulation scripts. Full detail is in
+`apps/email-worker/README.md`; the short version:
+
+1. **Add the domain to Cloudflare** (if not already) and enable Email Routing:
+   Dashboard → your domain → Email → Email Routing → accept the MX/TXT records
+2. Edit `apps/email-worker/wrangler.toml`:
+   ```toml
+   RIKO_INBOUND_URL = "https://riko-a1b2.onrender.com/inbound/mail"
+   ```
+3. Set the shared secret — must equal `INBOUND_MAIL_SECRET` from step 1:
+   ```bash
+   pnpm --filter @riko/email-worker exec wrangler secret put RIKO_INBOUND_SECRET
+   ```
+4. Log in and deploy:
+   ```bash
+   pnpm --filter @riko/email-worker exec wrangler login
+   pnpm --filter @riko/email-worker deploy
+   ```
+5. **Route catch-all to the worker** — Email Routing → Routing rules →
+   Catch-all address → action **Send to a Worker** → `riko-inbound-mail`.
+   This has to be catch-all, not a rule for a specific address: replies arrive
+   at `billing+<case-id>@yourdomain.com`, and Cloudflare's custom-address
+   rules match exactly, so a rule for `billing@yourdomain.com` alone will
+   never see them.
+6. Set the sender identity's Reply-To (step 9) to the **untagged** base
+   address, e.g. `billing@yourdomain.com`. Riko adds the case tag itself.
+
+Verify without waiting on real mail:
+
+```bash
+cd apps/api
+API_BASE_URL=https://riko-a1b2.onrender.com \
+  INBOUND_MAIL_SECRET=<same value> \
+  pnpm exec tsx --env-file=../../.env scripts/send-tagged-reply.ts
+```
+
+Watch the Cloudflare Worker logs live with `wrangler tail` while you send a
+real reply to confirm end to end.
+
+## Redeploying
+
+Render redeploys automatically on every push to the deploy branch. Migrations
+run again on every build — they're idempotent, so this is safe even when
+nothing changed. To redeploy without a code change (e.g. after editing an env
+var by hand), use **Manual Deploy → Deploy latest commit** in the dashboard.
+
+## Rolling back
+
+Render keeps prior deploys. Dashboard → your service → **Events** → find the
+last good deploy → **Rollback to this deploy**. This does not revert the
+database — if a bad deploy included a migration, rolling back the app code
+alone will not undo the schema change.
+
+## Cost
+
+Everything above is free at hackathon scale:
+
+| Piece | Plan | Cost |
+|---|---|---|
+| Render web service | Free | $0 |
+| Neon Postgres | Free (0.5 GB) | $0 |
+| Cloudflare Workers | Free (100k req/day) | $0 |
+| Cloudflare Email Routing | Free | $0 |
+| NVIDIA NIM | Free tier | $0 |
+| cron-job.org keepalive | Free | $0 |
+
+The only paid dependency is Razorpay itself in live mode, and test mode (used
+throughout this guide) is free.
+
+## Troubleshooting
+
+**Sign-in 500s immediately after first deploy.** `BETTER_AUTH_URL` isn't set
+yet — see step 5.
+
+**Webhooks return 400.** Signature mismatch. Recheck the secret is
+byte-identical between Riko's connection and Razorpay's webhook config — see
+step 8b.
+
+**Cases sit in `NEW` forever.** `RUN_WORKER` isn't `1`, or the worker log line
+is missing on boot — see step 6.
+
+**Every case gets stuck before sending, closed with `no_verified_sender`.**
+Sender identity isn't configured — see step 9.
+
+**A demo webhook silently never arrived.** The service was asleep and
+Razorpay's delivery timed out before the 50-second cold start finished — see
+step 7, and confirm the keepalive cron is actually running before a live demo.
+
+**Inbound replies return `{"status":"ignored"}`.** Either the Email Routing
+rule isn't catch-all (see step 10.5), or the case the reply threads to has
+already closed — `/inbound/mail` only matches cases in `NEW`, `DRAFTING`,
+`SENDING`, `WAITING`, or `PROMISED`.
+
+**`useActiveOrganization` or similar type errors in the editor after a
+`pnpm install`.** Almost always a stale TypeScript server, not a real error —
+run `pnpm -r typecheck` from a terminal to check the ground truth, then
+restart the TS server in your editor.
+
+## Environment variable reference
+
+Everything Riko reads from the environment, beyond what's already covered
+above. All optional ones have safe defaults for a demo.
+
+| Variable | Required | Default | Effect |
+|---|---|---|---|
+| `HOLDOUT_PERCENT` | No | `5` | % of cases held back as the uncontacted control group |
+| `CONTACT_WINDOW_START_HOUR` | No | `8` | Local hour outreach may start |
+| `CONTACT_WINDOW_END_HOUR` | No | `19` | Local hour outreach must stop by |
+| `DEFAULT_CUSTOMER_TIMEZONE` | No | `Asia/Kolkata` | Fallback when a customer has no stored timezone |
+| `UNSUBSCRIBE_RATE_LIMIT` | No | `0.1` | Opt-out rate per send that trips the circuit breaker |
+| `COST_PER_SEND_MINOR` | No | `0` | Assumed cost per email, for the net-recovered metric |
+| `WORKER_POLL_MS` | No | `15000` | How often the in-process worker loop ticks |
+| `NVIDIA_NIM_MODEL` | No | `meta/llama-3.1-8b-instruct` | Drafting model |
+| `NVIDIA_NIM_BASE_URL` | No | NVIDIA's public endpoint | Override for a self-hosted NIM |

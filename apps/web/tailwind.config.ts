@@ -1,0 +1,100 @@
+import type { Config } from "tailwindcss";
+import animate from "tailwindcss-animate";
+
+export default {
+  darkMode: ["class"],
+  content: ["./index.html", "./src/**/*.{ts,tsx}"],
+  theme: {
+    extend: {
+      colors: {
+        ink: "hsl(var(--ink) / <alpha-value>)",
+        "ink-muted": "hsl(var(--ink-muted) / <alpha-value>)",
+        "ink-faint": "hsl(var(--ink-faint) / <alpha-value>)",
+        surface: "hsl(var(--surface) / <alpha-value>)",
+        "surface-sunk": "hsl(var(--surface-sunk) / <alpha-value>)",
+        line: "hsl(var(--line) / <alpha-value>)",
+        "line-strong": "hsl(var(--line-strong) / <alpha-value>)",
+        "surface-cream": "hsl(var(--surface-cream) / <alpha-value>)",
+        "ink-secondary": "hsl(var(--ink-secondary) / <alpha-value>)",
+        "brand-dark": "hsl(var(--brand-dark) / <alpha-value>)",
+        accent: {
+          DEFAULT: "hsl(var(--accent) / <alpha-value>)",
+          hover: "hsl(var(--accent-hover) / <alpha-value>)",
+          press: "hsl(var(--accent-press) / <alpha-value>)",
+          soft: "hsl(var(--accent-soft) / <alpha-value>)",
+          foreground: "hsl(var(--accent-foreground) / <alpha-value>)",
+        },
+        recovered: "hsl(var(--recovered) / <alpha-value>)",
+        waiting: "hsl(var(--waiting) / <alpha-value>)",
+        lost: "hsl(var(--lost) / <alpha-value>)",
+        skipped: "hsl(var(--skipped) / <alpha-value>)",
+        border: "hsl(var(--line) / <alpha-value>)",
+        input: "hsl(var(--line-strong) / <alpha-value>)",
+        ring: "hsl(var(--accent) / <alpha-value>)",
+        background: "hsl(var(--surface) / <alpha-value>)",
+        foreground: "hsl(var(--ink) / <alpha-value>)",
+        muted: {
+          DEFAULT: "hsl(var(--surface-sunk) / <alpha-value>)",
+          foreground: "hsl(var(--ink-muted) / <alpha-value>)",
+        },
+        popover: {
+          DEFAULT: "hsl(var(--surface) / <alpha-value>)",
+          foreground: "hsl(var(--ink) / <alpha-value>)",
+        },
+        card: {
+          DEFAULT: "hsl(var(--surface) / <alpha-value>)",
+          foreground: "hsl(var(--ink) / <alpha-value>)",
+        },
+      },
+      fontFamily: {
+        serif: ["'Instrument Serif'", "serif"],
+        sans: ["'Inter Variable'", "Inter", "sans-serif"],
+        mono: ["'JetBrains Mono'", "monospace"],
+        jakarta: ["'Plus Jakarta Sans Variable'", "'Plus Jakarta Sans'", "sans-serif"],
+      },
+      fontSize: {
+        "display-xxl": ["56px", { lineHeight: "1.03", letterSpacing: "-1.4px", fontWeight: "300" }],
+        "display-xl": ["48px", { lineHeight: "1.15", letterSpacing: "-0.96px", fontWeight: "300" }],
+        "display-lg": ["32px", { lineHeight: "1.1", letterSpacing: "-0.64px", fontWeight: "300" }],
+        "display-md": ["26px", { lineHeight: "1.12", letterSpacing: "-0.26px", fontWeight: "300" }],
+        title: ["20px", { lineHeight: "1.3", fontWeight: "600" }],
+        subtitle: ["15px", { lineHeight: "1.4", fontWeight: "600" }],
+        label: ["12px", { lineHeight: "1.4", fontWeight: "500", letterSpacing: "0.02em" }],
+        caption: ["13px", { lineHeight: "1.4", fontWeight: "400", letterSpacing: "-0.39px" }],
+        "figure-lg": ["32px", { lineHeight: "1.1", fontWeight: "600" }],
+        figure: ["16px", { lineHeight: "1.2", fontWeight: "500" }],
+      },
+      borderRadius: {
+        xs: "4px",
+        sm: "6px",
+        DEFAULT: "8px",
+        md: "8px",
+        lg: "12px",
+        xl: "16px",
+        pill: "9999px",
+      },
+      boxShadow: {
+        sm: "0 1px 3px rgba(0,55,112,0.08)",
+        md: "0 8px 24px rgba(0,55,112,0.08), 0 2px 6px rgba(0,55,112,0.04)",
+        lg: "0 8px 24px rgba(0,55,112,0.08), 0 2px 6px rgba(0,55,112,0.04)",
+      },
+      transitionDuration: {
+        DEFAULT: "150ms",
+      },
+      transitionTimingFunction: {
+        DEFAULT: "ease-out",
+      },
+      spacing: {
+        1: "4px",
+        2: "8px",
+        3: "12px",
+        4: "16px",
+        6: "24px",
+        8: "32px",
+        12: "48px",
+        16: "64px",
+      },
+    },
+  },
+  plugins: [animate],
+} satisfies Config;

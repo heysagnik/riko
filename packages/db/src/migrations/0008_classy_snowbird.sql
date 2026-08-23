@@ -1,0 +1,1 @@
+ALTER TABLE "cases" ADD COLUMN "human_reviewed_at" timestamp with time zone;

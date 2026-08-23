@@ -1,0 +1,15 @@
+name = "riko-inbound-mail"
+main = "src/index.ts"
+compatibility_date = "2026-08-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+# Public URL of the Riko API. Cloudflare cannot reach localhost, so this is
+# either a deployed API or a tunnel hostname.
+RIKO_INBOUND_URL = "https://your-api-host/inbound/mail"
+
+# Replies Riko could not tie to a case go here instead of vanishing. Optional.
+# FORWARD_UNMATCHED_TO = "you@example.com"
+
+# RIKO_INBOUND_SECRET is a secret, not a var:
+#   pnpm exec wrangler secret put RIKO_INBOUND_SECRET
