@@ -254,44 +254,162 @@ to the right case.
 ## 10. Inbound email (Cloudflare Worker)
 
 Optional, but required for the promise-to-pay and reply-classification loop to
-work with real customers instead of the simulation scripts. Full detail is in
-`apps/email-worker/README.md`; the short version:
+work with real customers instead of the simulation scripts. This section is
+self-contained — it assumes only that step 4–6 already gave you a live Render
+URL (`https://riko-a1b2.onrender.com` in every example below; substitute your
+own throughout).
 
-1. **Add the domain to Cloudflare** (if not already) and enable Email Routing:
-   Dashboard → your domain → Email → Email Routing → accept the MX/TXT records
-2. Edit `apps/email-worker/wrangler.toml`:
-   ```toml
-   RIKO_INBOUND_URL = "https://riko-a1b2.onrender.com/inbound/mail"
-   ```
-3. Set the shared secret — must equal `INBOUND_MAIL_SECRET` from step 1:
-   ```bash
-   pnpm --filter @riko/email-worker exec wrangler secret put RIKO_INBOUND_SECRET
-   ```
-4. Log in and deploy:
-   ```bash
-   pnpm --filter @riko/email-worker exec wrangler login
-   pnpm --filter @riko/email-worker deploy
-   ```
-5. **Route catch-all to the worker** — Email Routing → Routing rules →
-   Catch-all address → action **Send to a Worker** → `riko-inbound-mail`.
-   This has to be catch-all, not a rule for a specific address: replies arrive
-   at `billing+<case-id>@yourdomain.com`, and Cloudflare's custom-address
-   rules match exactly, so a rule for `billing@yourdomain.com` alone will
-   never see them.
-6. Set the sender identity's Reply-To (step 9) to the **untagged** base
-   address, e.g. `billing@yourdomain.com`. Riko adds the case tag itself.
+Reference: `apps/email-worker/README.md` covers the same ground more tersely,
+plus the behavioural notes (message size limits, retry semantics) that don't
+belong in a deploy doc.
 
-Verify without waiting on real mail:
+### 10a. Install Wrangler and log in
+
+Wrangler is already a devDependency of `apps/email-worker`, so no global
+install is needed — `pnpm exec` resolves it from the workspace.
+
+```bash
+pnpm --filter @riko/email-worker exec wrangler login
+```
+
+This opens a browser tab to authorize the CLI against your Cloudflare
+account. If you're in a headless environment, use `wrangler login` with the
+`--browser=false` flag and follow the printed URL manually.
+
+### 10b. Add the domain to Cloudflare and enable Email Routing
+
+Skip this if the domain is already on Cloudflare with Email Routing enabled.
+
+1. [dash.cloudflare.com](https://dash.cloudflare.com) → **Add a domain** →
+   enter the domain you want replies to arrive at (e.g. `yourdomain.com`)
+2. Update the domain's nameservers at your registrar to the two Cloudflare
+   assigns — this step is outside Cloudflare and can take anywhere from a few
+   minutes to a few hours to propagate
+3. Once Cloudflare shows the domain as **Active**: domain → **Email** →
+   **Email Routing** → **Get started**. Cloudflare proposes MX and TXT
+   records and, on a Cloudflare-managed domain, adds them automatically —
+   confirm and continue.
+
+### 10c. Point the worker at your Render deployment
+
+Edit `apps/email-worker/wrangler.toml`:
+
+```toml
+name = "riko-inbound-mail"
+main = "src/index.ts"
+compatibility_date = "2026-08-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+RIKO_INBOUND_URL = "https://riko-a1b2.onrender.com/inbound/mail"
+```
+
+This is the only line that changes. `RIKO_INBOUND_URL` must be the full path
+including `/inbound/mail` — not just the host — since the worker POSTs to it
+directly with no path rewriting.
+
+### 10d. Set the shared secret
+
+The worker and the Render service authenticate to each other with one shared
+value. It must be **exactly** the `INBOUND_MAIL_SECRET` you set on the Render
+service in step 4 — any difference and every message is rejected with 401
+before it's even classified.
+
+```bash
+pnpm --filter @riko/email-worker exec wrangler secret put RIKO_INBOUND_SECRET
+# paste the same value as Render's INBOUND_MAIL_SECRET when prompted
+```
+
+Secrets set this way are encrypted at rest by Cloudflare and never appear in
+`wrangler.toml` or any log — this is deliberate, and different from `[vars]`,
+which is plaintext and fine for a non-secret like the inbound URL.
+
+### 10e. Deploy the worker
+
+```bash
+pnpm --filter @riko/email-worker cf:deploy
+```
+
+Expect output ending in something like:
+
+```
+Uploaded riko-inbound-mail (2.1 sec)
+Deployed riko-inbound-mail triggers (0.4 sec)
+  https://riko-inbound-mail.<your-subdomain>.workers.dev
+```
+
+That URL is irrelevant for email — it's the worker's HTTP entry point, which
+this worker doesn't use (it's triggered by the `email()` handler, not by
+requests to that URL). What matters is that the deploy succeeded and the
+worker is now registered as `riko-inbound-mail` in your account, which is the
+name the next step needs.
+
+### 10f. Route catch-all mail to the worker
+
+Cloudflare dashboard → your domain → **Email** → **Email Routing** →
+**Routing rules** → **Catch-all address** → set action to **Send to a
+Worker** → select `riko-inbound-mail` → **Save**.
+
+This must be the **catch-all** rule, not a custom rule for a specific
+address like `billing@yourdomain.com`. Every outgoing recovery email carries
+a plus-tagged Reply-To —
+
+```
+billing+6b7f2848-6da8-4e6d-99f8-71a726f56686@yourdomain.com
+```
+
+— and Cloudflare's custom-address rules match the local part **exactly**, so
+a rule scoped to `billing@yourdomain.com` alone will never see anything with
+a `+` in it. Catch-all is what makes every tagged address reach the worker
+regardless of what precedes the `+`.
+
+### 10g. Point the sender identity's Reply-To at the domain
+
+In the Riko dashboard: Settings → Sender Identity → Reply-To, set it to the
+**untagged** base address on the domain you just configured, e.g.
+`billing@yourdomain.com`. Riko appends `+<case-id>` itself before every send
+(`taggedReplyTo` in `packages/core/src/inbound/address-tag.ts`) — do not
+include a tag here.
+
+### 10h. Verify the wiring end to end
+
+Without waiting on real mail, replay what the worker would send:
 
 ```bash
 cd apps/api
 API_BASE_URL=https://riko-a1b2.onrender.com \
-  INBOUND_MAIL_SECRET=<same value> \
+  INBOUND_MAIL_SECRET=<same value as Render's INBOUND_MAIL_SECRET> \
   pnpm exec tsx --env-file=../../.env scripts/send-tagged-reply.ts
 ```
 
-Watch the Cloudflare Worker logs live with `wrangler tail` while you send a
-real reply to confirm end to end.
+A successful run prints `{"status":"applied", ...}` and the matching case in
+the dashboard moves state (typically to `PROMISED` or `ESCALATED`, depending
+on the reply text in the script).
+
+Then confirm the real path. In one terminal:
+
+```bash
+pnpm --filter @riko/email-worker exec wrangler tail
+```
+
+From any mail client, reply to a genuine recovery email Riko sent. The tail
+should show the worker invoked within a few seconds, followed by the same
+`{"status": ...}` shape logged from the fetch to Render. If nothing appears
+in the tail at all, the catch-all rule isn't wired to this worker — recheck
+10f. If the tail shows the invocation but Render logs a 401, the secrets in
+10d don't match.
+
+### Multi-tenant note
+
+Each tenant's inbound mail rides on **their own domain's** Email Routing,
+because the plus-tagged address is built from that tenant's own Reply-To
+(step 10g). The worker itself, `RIKO_INBOUND_URL`, and `INBOUND_MAIL_SECRET`
+are shared infrastructure — one deployment serves every tenant — but nothing
+about routing is tenant-specific inside the worker. `/inbound/mail` resolves
+the tenant purely from the case the tagged address points to
+(`caseIdFromRecipient` → `case.tenantId`), so a second tenant onboarding
+later just needs their own domain added to Cloudflare and routed to this same
+`riko-inbound-mail` worker — no code change, no second deployment.
 
 ## Redeploying
 
@@ -360,9 +478,35 @@ Razorpay's delivery timed out before the 50-second cold start finished — see
 step 7, and confirm the keepalive cron is actually running before a live demo.
 
 **Inbound replies return `{"status":"ignored"}`.** Either the Email Routing
-rule isn't catch-all (see step 10.5), or the case the reply threads to has
+rule isn't catch-all (see step 10f), or the case the reply threads to has
 already closed — `/inbound/mail` only matches cases in `NEW`, `DRAFTING`,
 `SENDING`, `WAITING`, or `PROMISED`.
+
+**`wrangler tail` shows nothing when you send a real reply.** The catch-all
+rule isn't pointed at `riko-inbound-mail` — recheck step 10f. A quick way to
+confirm the rule itself is live: send *any* mail to a nonsense address on the
+domain (e.g. `asdf123@yourdomain.com`); if the worker never fires for that
+either, the routing rule is the problem, not the reply's tag.
+
+**`wrangler tail` shows the invocation, but Render logs a 401 on
+`/inbound/mail`.** `RIKO_INBOUND_SECRET` (set via `wrangler secret put`, step
+10d) doesn't match `INBOUND_MAIL_SECRET` on the Render service. Re-run
+`wrangler secret put` with the exact value from Render's Environment tab —
+there's no way to read back a Cloudflare secret once set, only overwrite it.
+
+**`ERR_PNPM_INVALID_DEPLOY_TARGET: This command requires one parameter`.**
+`deploy` is a reserved pnpm subcommand (for deploying a package to a
+directory), so `pnpm --filter @riko/email-worker deploy` gets intercepted by
+pnpm itself rather than running the worker's script — that's why the script
+is named `cf:deploy`, not `deploy`. Use `pnpm --filter @riko/email-worker
+cf:deploy` exactly as written above.
+
+**Worker deploy succeeds but no domain shows up to route from.** Deploying
+the worker (step 10e) and adding a domain to Cloudflare (step 10b) are
+independent — deploying doesn't require a domain, and a domain doesn't
+require a worker. If Email Routing → Routing rules shows no worker option,
+the domain's Email Routing (10b) hasn't finished activating; it can take a
+few minutes after accepting the MX/TXT records.
 
 **`useActiveOrganization` or similar type errors in the editor after a
 `pnpm install`.** Almost always a stale TypeScript server, not a real error —

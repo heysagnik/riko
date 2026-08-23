@@ -6,7 +6,7 @@ compatibility_flags = ["nodejs_compat"]
 [vars]
 # Public URL of the Riko API. Cloudflare cannot reach localhost, so this is
 # either a deployed API or a tunnel hostname.
-RIKO_INBOUND_URL = "https://your-api-host/inbound/mail"
+RIKO_INBOUND_URL = "https://riko.sagnik.fun/inbound/mail"
 
 # Replies Riko could not tie to a case go here instead of vanishing. Optional.
 # FORWARD_UNMATCHED_TO = "you@example.com"

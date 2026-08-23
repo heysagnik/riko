@@ -44,7 +44,7 @@ pnpm --filter @riko/email-worker exec wrangler secret put RIKO_INBOUND_SECRET
 **4. Deploy:**
 
 ```
-pnpm --filter @riko/email-worker deploy
+pnpm --filter @riko/email-worker cf:deploy
 ```
 
 **5. Route catch-all to the worker.** Email Routing → Routing rules →
