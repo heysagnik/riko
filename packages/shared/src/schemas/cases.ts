@@ -24,6 +24,8 @@ export type CaseStateGroup = keyof typeof CASE_STATE_GROUPS;
 
 export const caseListQuerySchema = z.object({
   state: z.enum(["ALL", ...CASE_STATES, ...(Object.keys(CASE_STATE_GROUPS) as CaseStateGroup[])]).default("ALL"),
+  from: z.string().datetime().optional(),
+  to: z.string().datetime().optional(),
   offset: z.coerce.number().int().min(0).default(0),
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });

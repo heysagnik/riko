@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, integer, bigserial, index, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, integer, bigserial, boolean, index, pgEnum } from "drizzle-orm/pg-core";
 import { organization } from "./auth.js";
 import { exposures } from "./exposures.js";
 import { customers } from "./customers.js";
@@ -26,6 +26,7 @@ export const cases = pgTable("cases", {
   attemptCount: integer("attempt_count").notNull().default(0),
   // Separate from attemptCount so a chatty customer cannot loop forever.
   agentReplyCount: integer("agent_reply_count").notNull().default(0),
+  awaitingAgentReply: boolean("awaiting_agent_reply").notNull().default(false),
   nextActionAt: timestamp("next_action_at", { withTimezone: true }),
   intervention: text("intervention"),
   interventionReason: text("intervention_reason"),

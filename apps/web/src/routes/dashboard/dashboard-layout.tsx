@@ -9,16 +9,12 @@ import {
   SidebarSimpleIcon,
   HouseIcon,
   ListChecksIcon,
-  ShieldCheckIcon,
   WarningIcon,
-  UserFocusIcon,
   PlugIcon,
   GearIcon,
   SunIcon,
   MoonIcon,
 } from "@phosphor-icons/react";
-import { Blobatar } from "@blobatar/react";
-import "blobatar/motion.css";
 import { Logo } from "../../components/logo.js";
 import {
   DropdownMenu,
@@ -38,9 +34,7 @@ import { useTheme } from "../../lib/theme.js";
 const navItems = [
   { to: "/dashboard", label: "Overview", end: true, icon: HouseIcon },
   { to: "/dashboard/cases", label: "Cases", end: false, icon: ListChecksIcon },
-  { to: "/dashboard/needs-you", label: "Needs you", end: false, icon: UserFocusIcon },
   { to: "/dashboard/exceptions", label: "Exceptions", end: false, icon: WarningIcon },
-  { to: "/dashboard/policy", label: "Policy", end: false, icon: ShieldCheckIcon },
   { to: "/dashboard/connections", label: "Connections", end: false, icon: PlugIcon },
   { to: "/dashboard/settings", label: "Settings", end: false, icon: GearIcon },
 ];
@@ -121,7 +115,7 @@ export function DashboardLayout() {
           <span className="sr-only">Close navigation</span>
         </button>
       </div>
-      <nav className="flex flex-1 flex-col gap-0.5 px-2 py-2">
+      <nav className="flex flex-1 flex-col gap-0.5 px-1 py-2">
         {navItems.map((item) => {
           const Icon = item.icon;
           return (
@@ -159,7 +153,9 @@ export function DashboardLayout() {
                 collapsed && "md:justify-center",
               )}
             >
-              <Blobatar name={userEmail || userName} size={28} animate="hover" className="shrink-0 rounded-full" />
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-line bg-accent-soft text-caption font-medium text-ink">
+                {(userName || userEmail).charAt(0).toUpperCase() || "?"}
+              </span>
               <span className={cn("min-w-0 flex-1 truncate", collapsed && "md:hidden")}>{userName}</span>
               <CaretUpDownIcon size={14} weight="regular" className={cn("shrink-0 text-ink-faint", collapsed && "md:hidden")} />
             </button>
@@ -175,33 +171,38 @@ export function DashboardLayout() {
               Help
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <div
-              role="button"
-              tabIndex={0}
-              className="flex w-full cursor-pointer items-center justify-between rounded-sm px-2 py-2 text-sm text-ink-muted transition-colors duration-150 ease-out hover:bg-surface-sunk hover:text-ink focus:bg-surface-sunk focus:text-ink focus:outline-none"
-              onClick={toggleTheme}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  toggleTheme();
-                }
-              }}
-            >
-              <span className="flex items-center gap-2.5">
-                {resolvedTheme === "dark" ? (
-                  <MoonIcon size={16} weight="regular" className="shrink-0" />
-                ) : (
-                  <SunIcon size={16} weight="regular" className="shrink-0" />
-                )}
-                Dark mode
-              </span>
-              <Switch
-                checked={resolvedTheme === "dark"}
-                onCheckedChange={(checked) => {
-                  setTheme(checked ? "dark" : "light");
-                }}
-                onClick={(e) => e.stopPropagation()}
-              />
+            <div className="flex w-full items-center justify-between rounded-sm px-2 py-2 text-sm text-ink-muted">
+              <span>Appearance</span>
+              <div className="flex items-center gap-1 rounded-md border border-line bg-surface-sunk p-0.5">
+                <button
+                  type="button"
+                  aria-label="Light mode"
+                  aria-pressed={resolvedTheme === "light"}
+                  onClick={() => setTheme("light")}
+                  className={cn(
+                    "flex h-6 w-6 items-center justify-center rounded transition-colors duration-150 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
+                    resolvedTheme === "light"
+                      ? "bg-surface text-ink shadow-sm"
+                      : "text-ink-faint hover:text-ink",
+                  )}
+                >
+                  <SunIcon size={14} weight={resolvedTheme === "light" ? "fill" : "regular"} />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Dark mode"
+                  aria-pressed={resolvedTheme === "dark"}
+                  onClick={() => setTheme("dark")}
+                  className={cn(
+                    "flex h-6 w-6 items-center justify-center rounded transition-colors duration-150 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
+                    resolvedTheme === "dark"
+                      ? "bg-surface text-ink shadow-sm"
+                      : "text-ink-faint hover:text-ink",
+                  )}
+                >
+                  <MoonIcon size={14} weight={resolvedTheme === "dark" ? "fill" : "regular"} />
+                </button>
+              </div>
             </div>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleSignOut}>

@@ -14,6 +14,11 @@ import { loadPendingOutreach } from "./loaders/load-pending-outreach.js";
 
 const POLL_INTERVAL_MS = Number(process.env.WORKER_POLL_MS ?? 15_000);
 
+// Replies aren't time-critical the way scheduled sends are, so this runs on a
+// coarser cadence than the rest of the tick to cut LLM calls and DB reads.
+const AGENT_REPLY_INTERVAL_MS = 60_000;
+let lastAgentReplyRunAt = 0;
+
 export async function tick(): Promise<void> {
   await processCircuitBreaker();
   await processExposureSweep();
@@ -22,7 +27,12 @@ export async function tick(): Promise<void> {
   await processScheduledDrafts(loadCaseFacts);
   await processDraftingCases(loadCaseFacts);
   await processSendingCases(loadPendingOutreach);
-  await processAgentReplies({ loadPendingOutreach, loadReplyContext });
+
+  const now = Date.now();
+  if (now - lastAgentReplyRunAt >= AGENT_REPLY_INTERVAL_MS) {
+    lastAgentReplyRunAt = now;
+    await processAgentReplies({ loadPendingOutreach, loadReplyContext });
+  }
 }
 
 // The worker runs inside the API process, where a stalled loop is invisible:

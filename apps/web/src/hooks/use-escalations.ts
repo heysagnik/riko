@@ -51,3 +51,42 @@ export function useResolveEscalation() {
     },
   });
 }
+
+export function useHandOffCase() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (caseId: string) => {
+      const response = await fetch(`/api/cases/${caseId}/hand-off`, { method: "POST" });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error ?? `Failed to hand off: ${response.status}`);
+      }
+      return response.json() as Promise<{ ok: true; state: string }>;
+    },
+    onSuccess: (_data, caseId) => {
+      queryClient.invalidateQueries({ queryKey: ["cases", caseId] });
+      queryClient.invalidateQueries({ queryKey: ["escalations"] });
+    },
+  });
+}
+
+export function useReplyToCase() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ caseId, body, subject }: { caseId: string; body: string; subject?: string }) => {
+      const response = await fetch(`/api/cases/${caseId}/reply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body, subject }),
+      });
+      if (!response.ok) {
+        const errorBody = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(errorBody?.error ?? `Failed to send reply: ${response.status}`);
+      }
+      return response.json() as Promise<{ ok: true }>;
+    },
+    onSuccess: (_data, { caseId }) => {
+      queryClient.invalidateQueries({ queryKey: ["cases", caseId] });
+    },
+  });
+}

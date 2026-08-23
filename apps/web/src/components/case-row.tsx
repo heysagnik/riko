@@ -64,110 +64,100 @@ export interface CaseRowData {
   ageLabel: string;
 }
 
-export interface CaseRowProps {
+export interface CaseRowRowProps {
   data: CaseRowData;
   onClick?: () => void;
 }
 
-const COLUMN_COUNT = 7;
+function AttemptPips({ count, cap }: { count: number; cap: number }) {
+  if (count === 0) return null;
+  return (
+    <span className="flex items-center gap-1" aria-label={`${count} of ${cap} attempts used`}>
+      {Array.from({ length: cap }).map((_, i) => (
+        <span
+          key={i}
+          aria-hidden
+          className={cn("h-1 w-3 rounded-full", i < count ? "bg-ink-faint" : "bg-line")}
+        />
+      ))}
+    </span>
+  );
+}
+
+function AvatarDot({ name }: { name: string }) {
+  return (
+    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-line bg-surface-sunk text-caption font-medium text-ink-muted">
+      {name.charAt(0).toUpperCase() || "?"}
+    </span>
+  );
+}
 
 function InterventionBadge({ kind }: { kind: string | null }) {
   if (!kind) return <span className="text-ink-faint">—</span>;
   return <Badge variant={INTERVENTION_TONE[kind] ?? "default"}>{interventionLabel(kind)}</Badge>;
 }
 
-export function CaseRow({ data, onClick }: CaseRowProps) {
-  const trackFill = Math.min(100, (data.attemptCount / data.attemptCap) * 100);
-  const showTrack = data.attemptCount > 0 && !["RECOVERED", "SKIPPED"].includes(data.state);
-
+export function CaseRow({ data, onClick }: CaseRowRowProps) {
   return (
-    <>
-      <TableRow
-        onClick={onClick}
-        className={cn("relative", showTrack ? "border-b-0" : "", onClick && "cursor-pointer hover:bg-surface-sunk")}
-      >
-        <TableCell className="relative w-0 p-0">
-          <span className={cn("absolute inset-y-0 left-0 w-0.5", STATE_MARKER_CLASS[data.state])} />
-        </TableCell>
-        <TableCell className="pl-4">
+    <TableRow
+      onClick={onClick}
+      className={cn("group border-b border-line", onClick && "cursor-pointer hover:bg-surface-sunk")}
+    >
+      <TableCell className="pl-4 pr-3 py-2.5">
+        <span className="flex items-center gap-2.5">
           <Badge variant={STATE_BADGE_VARIANT[data.state]}>{STATE_LABEL[data.state]}</Badge>
-        </TableCell>
-        <TableCell className="text-ink">{failureLabel(data.failureCategory)}</TableCell>
-        <TableCell>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="w-fit cursor-help">
-                <InterventionBadge kind={data.intervention} />
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>{reasonLabel(data.interventionReason)}</TooltipContent>
-          </Tooltip>
-        </TableCell>
-        <TableCell className="text-ink">
-          <span className="flex items-center gap-2">
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-line bg-surface-sunk text-caption font-medium text-ink-muted">
-              {data.customerName.charAt(0).toUpperCase() || "?"}
+          <AttemptPips count={data.attemptCount} cap={data.attemptCap} />
+        </span>
+      </TableCell>
+      <TableCell className="py-2.5 pr-4 text-ink">{failureLabel(data.failureCategory)}</TableCell>
+      <TableCell className="py-2.5 pr-4">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="w-fit cursor-help">
+              <InterventionBadge kind={data.intervention} />
             </span>
-            <span className="truncate">{data.customerName}</span>
-          </span>
-        </TableCell>
-        <TableCell className="text-right text-figure tabular-nums text-ink">{data.amountLabel}</TableCell>
-        <TableCell className="text-right text-caption tabular-nums text-ink-faint">{data.ageLabel}</TableCell>
-      </TableRow>
-      {showTrack ? (
-        <TableRow className="border-b border-line hover:bg-transparent">
-          <TableCell colSpan={COLUMN_COUNT} className="h-px p-0">
-            <div className="h-px w-full bg-line">
-              <div
-                className="h-px bg-ink-faint transition-all duration-150 ease-out"
-                style={{ width: `${trackFill}%` }}
-              />
-            </div>
-          </TableCell>
-        </TableRow>
-      ) : null}
-    </>
+          </TooltipTrigger>
+          <TooltipContent>{reasonLabel(data.interventionReason)}</TooltipContent>
+        </Tooltip>
+      </TableCell>
+      <TableCell className="py-2.5 pr-4 text-ink">
+        <span className="flex min-w-0 items-center gap-2.5">
+          <AvatarDot name={data.customerName} />
+          <span className="truncate font-medium">{data.customerName}</span>
+        </span>
+      </TableCell>
+      <TableCell className="py-2.5 pr-4 text-right text-figure tabular-nums text-ink">{data.amountLabel}</TableCell>
+      <TableCell className="py-2.5 pr-4 text-right text-caption tabular-nums text-ink-faint">{data.ageLabel}</TableCell>
+    </TableRow>
   );
 }
 
-export function CaseRowMobile({ data, onClick }: CaseRowProps) {
-  const trackFill = Math.min(100, (data.attemptCount / data.attemptCap) * 100);
-  const showTrack = data.attemptCount > 0 && !["RECOVERED", "SKIPPED"].includes(data.state);
-
+export function CaseRowMobile({ data, onClick }: CaseRowRowProps) {
   return (
-    <div
+    <button
+      type="button"
       onClick={onClick}
-      className={cn(
-        "relative border-b border-line py-3 pl-4 pr-3",
-        onClick && "cursor-pointer transition-colors duration-150 hover:bg-surface-sunk",
-      )}
+      className="relative block w-full border-b border-line py-3 pl-4 pr-3 text-left transition-colors duration-150 active:bg-surface-sunk"
     >
-      <span className={cn("absolute inset-y-0 left-0 w-0.5", STATE_MARKER_CLASS[data.state])} />
+      <span className={cn("absolute inset-y-0 left-0 w-0.5", STATE_MARKER_CLASS[data.state])} aria-hidden />
       <div className="flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-line bg-surface-sunk text-caption font-medium text-ink-muted">
-            {data.customerName.charAt(0).toUpperCase() || "?"}
-          </span>
-          <span className="truncate text-sm text-ink">{data.customerName}</span>
-        </div>
+        <span className="flex min-w-0 items-center gap-2">
+          <AvatarDot name={data.customerName} />
+          <span className="truncate text-sm font-medium text-ink">{data.customerName}</span>
+        </span>
         <span className="shrink-0 text-figure tabular-nums text-ink">{data.amountLabel}</span>
       </div>
-      <div className="mt-2 flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
+      <div className="mt-1.5 flex items-center justify-between gap-3">
+        <span className="flex min-w-0 items-center gap-2">
           <Badge variant={STATE_BADGE_VARIANT[data.state]}>{STATE_LABEL[data.state]}</Badge>
           <span className="truncate text-caption text-ink-muted">{failureLabel(data.failureCategory)}</span>
-        </div>
+        </span>
         <span className="shrink-0 text-caption tabular-nums text-ink-faint">{data.ageLabel}</span>
       </div>
-      <p className="mt-1.5 truncate text-caption text-ink-faint">{reasonLabel(data.interventionReason)}</p>
-      {showTrack ? (
-        <div className="mt-2 h-px w-full bg-line">
-          <div
-            className="h-px bg-ink-faint transition-all duration-150 ease-out"
-            style={{ width: `${trackFill}%` }}
-          />
-        </div>
-      ) : null}
-    </div>
+      <p className="mt-1 truncate text-caption text-ink-faint">{reasonLabel(data.interventionReason)}</p>
+      <div className="mt-1.5">
+        <AttemptPips count={data.attemptCount} cap={data.attemptCap} />
+      </div>
+    </button>
   );
 }

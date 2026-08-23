@@ -12,8 +12,6 @@ import { OverviewPage } from "./routes/dashboard/overview-page.js";
 import { CaseListPage } from "./routes/dashboard/case-list-page.js";
 import { CaseDetailPage } from "./routes/dashboard/case-detail-page.js";
 import { ExceptionsPage } from "./routes/dashboard/exceptions-page.js";
-import { PolicyPage } from "./routes/dashboard/policy-page.js";
-import { EscalationsPage } from "./routes/dashboard/escalations-page.js";
 import { ConnectionsPage } from "./routes/dashboard/connections-page.js";
 import { SettingsPage } from "./routes/dashboard/settings-page.js";
 
@@ -38,9 +36,7 @@ export const router = createBrowserRouter([
           { index: true, element: <OverviewPage /> },
           { path: "cases", element: <CaseListPage /> },
           { path: "cases/:caseId", element: <CaseDetailPage /> },
-          { path: "needs-you", element: <EscalationsPage /> },
           { path: "exceptions", element: <ExceptionsPage /> },
-          { path: "policy", element: <PolicyPage /> },
           { path: "connections", element: <ConnectionsPage /> },
           { path: "settings", element: <SettingsPage /> },
         ],

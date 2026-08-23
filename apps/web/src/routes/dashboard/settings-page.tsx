@@ -9,7 +9,87 @@ import { cn } from "../../lib/utils.js";
 const inputClass =
   "mt-1 w-full rounded-sm border border-line-strong bg-surface px-3 py-2 text-sm text-ink outline-none transition-colors duration-150 focus:border-accent";
 
-const SAMPLE_BODY = `<p style="margin:0 0 14px;">Hi Ananya Krishnan, the card we have on file expired, so this month's INR 2,499.00 payment did not go through.</p><p style="margin:0 0 14px;">Nothing has been cancelled — updating your card takes about a minute.</p><p style="margin:0;"><a href="#">Update your payment method</a></p>`;
+const SAMPLE_TEXT = `Hi, the payment of INR 1.00 to your ABC Merchant subscription did not go through. This is because we were unable to verify the card. Nothing has been cancelled - updating your card takes about a minute and everything picks up where it left off. Update your payment method: https://riko.sagnik.fun/pay/1576b556-e03b-42ee-8c62-5b8ba7f513eb. If you have already sorted this out, you can ignore this email. Unsubscribe: https://riko.sagnik.fun/unsubscribe/11fb8ead-cdc1-4cfb-843e-244911da8e88`;
+
+function escapeHtml(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+const URL_PATTERN = /https?:\/\/\S+/g;
+const LABEL_PATTERN = /([A-Za-z][\w '-]{2,60}):\s*$/;
+
+function renderButton(label: string, url: string): string {
+  return (
+    `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:6px 0 16px;">` +
+    `<tr><td style="border-radius:6px;background:#2563eb;">` +
+    `<a href="${escapeHtml(url)}" style="display:inline-block;padding:10px 20px;font-size:14px;font-weight:600;` +
+    `color:#ffffff;text-decoration:none;border-radius:6px;font-family:inherit;">${escapeHtml(label)}</a>` +
+    `</td></tr></table>`
+  );
+}
+
+function renderFooterLink(label: string, url: string): string {
+  return (
+    `<p style="margin:16px 0 0;text-align:center;font-size:12px;">` +
+    `<a href="${escapeHtml(url)}" style="color:#8b94a3;text-decoration:underline;">${escapeHtml(label)}</a>` +
+    `</p>`
+  );
+}
+
+function renderParagraph(paragraph: string): string[] {
+  const matches = [...paragraph.matchAll(URL_PATTERN)];
+  if (matches.length === 0) {
+    const text = paragraph.trim();
+    return text ? [`<p style="margin:0 0 14px;">${escapeHtml(text).replace(/\n/g, "<br/>")}</p>`] : [];
+  }
+
+  const blocks: string[] = [];
+  let cursor = 0;
+  let inline = "";
+
+  const flushInline = () => {
+    if (inline.trim().length > 0) {
+      blocks.push(`<p style="margin:0 0 14px;">${inline.trim()}</p>`);
+    }
+    inline = "";
+  };
+
+  for (const match of matches) {
+    const rawUrl = match[0];
+    const url = rawUrl.replace(/[).,!?]+$/, "");
+    const trailingPunctuation = rawUrl.slice(url.length);
+    const idx = match.index ?? 0;
+    const before = paragraph.slice(cursor, idx);
+    const labelMatch = before.match(LABEL_PATTERN);
+
+    if (labelMatch && labelMatch[1]) {
+      const label = labelMatch[1].trim();
+      const precedingText = before.slice(0, labelMatch.index).trim();
+      if (precedingText) {
+        inline += `${escapeHtml(precedingText)} `;
+      }
+      flushInline();
+      blocks.push(/^unsubscribe$/i.test(label) ? renderFooterLink(label, url) : renderButton(label, url));
+    } else {
+      inline += `${escapeHtml(before)}<a href="${escapeHtml(url)}" style="color:#2563eb;">${escapeHtml(url)}</a>`;
+    }
+
+    cursor = idx + url.length + trailingPunctuation.length;
+  }
+
+  inline += escapeHtml(paragraph.slice(cursor)).replace(/\n/g, "<br/>");
+  flushInline();
+  return blocks;
+}
+
+function toParagraphHtml(body: string): string {
+  return body
+    .split(/\n{2,}/)
+    .flatMap((para) => renderParagraph(para.trim()))
+    .join("");
+}
+
+const SAMPLE_BODY = toParagraphHtml(SAMPLE_TEXT);
 
 const FALLBACK_TEMPLATE = `<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;padding:24px;background:#f5f6f8;">
   <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e4e7ec;border-radius:8px;">
@@ -43,7 +123,6 @@ export function SettingsPage() {
 
   const [fromName, setFromName] = useState("");
   const [fromEmail, setFromEmail] = useState("");
-  const [replyTo, setReplyTo] = useState("");
   const [smtpHost, setSmtpHost] = useState("");
   const [smtpPort, setSmtpPort] = useState("587");
   const [smtpSecure, setSmtpSecure] = useState(false);
@@ -58,7 +137,6 @@ export function SettingsPage() {
     if (!identity) return;
     setFromName(identity.fromName);
     setFromEmail(identity.fromEmail);
-    setReplyTo(identity.replyTo ?? "");
     setSmtpHost(identity.smtpHost ?? "");
     setSmtpPort(identity.smtpPort ? String(identity.smtpPort) : "587");
     setSmtpSecure(identity.smtpSecure);
@@ -82,7 +160,6 @@ export function SettingsPage() {
       await save.mutateAsync({
         fromName,
         fromEmail,
-        replyTo: replyTo || undefined,
         smtpHost,
         smtpPort: Number(smtpPort),
         smtpSecure,
@@ -179,17 +256,6 @@ export function SettingsPage() {
                         className={inputClass}
                         value={fromEmail}
                         onChange={(e) => setFromEmail(e.target.value)}
-                      />
-                    </label>
-                    <label className="block text-sm">
-                      <span className="text-label uppercase text-ink-muted">Reply-to (optional)</span>
-                      <input
-                        type="email"
-                        placeholder="support@acme.com"
-                        autoComplete="off"
-                        className={inputClass}
-                        value={replyTo}
-                        onChange={(e) => setReplyTo(e.target.value)}
                       />
                     </label>
                   </div>
@@ -297,7 +363,7 @@ export function SettingsPage() {
                       <div className="mt-1 overflow-hidden rounded-sm border border-line bg-white">
                         <iframe
                           title="Brand template preview"
-                          className="h-[420px] w-full"
+                          className="h-[420px] w-full pointer-events-none"
                           sandbox=""
                           srcDoc={buildPreview(brandTemplateHtml, fromName)}
                         />

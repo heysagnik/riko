@@ -1,9 +1,10 @@
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { db, cases, caseMessages, promises, appendCaseEvent } from "@riko/db";
 import { applyTransition, isWithinContactWindow, extractPromise, MIN_PROMISE_CONFIDENCE } from "@riko/core";
 import { reasonReply, validateReply, type ConversationTurn } from "@riko/agent";
 import { getTransporterForSmtpConfig } from "../lib/mailer.js";
+import { llmRateLimiter, processWithConcurrency, roundRobinByTenant } from "../lib/rate-limiter.js";
 import type { SendableOutreach } from "./process-sending-cases.js";
 
 const nim = createOpenAICompatible({
@@ -17,6 +18,11 @@ const model = nim.chatModel(process.env.NVIDIA_NIM_MODEL ?? "meta/llama-3.1-8b-i
 const MAX_AGENT_REPLIES = Number(process.env.MAX_AGENT_REPLIES ?? 5);
 
 const ANSWERABLE_STATES = ["WAITING", "PROMISED"] as const;
+
+// DB/SMTP work can overlap across cases; the LLM call itself still queues on
+// the shared rate limiter, so this just controls how much non-LLM work runs
+// at once.
+const REPLY_CONCURRENCY = 8;
 
 function quoteLines(body: string): string {
   return body
@@ -68,18 +74,9 @@ export async function processAgentReplies({ loadReplyContext }: AgentReplyDeps):
   const pending = await db
     .select({ id: cases.id, tenantId: cases.tenantId, state: cases.state, replyCount: cases.agentReplyCount })
     .from(cases)
-    .where(
-      and(
-        inArray(cases.state, [...ANSWERABLE_STATES]),
-        sql`exists (
-          select 1 from case_messages m
-          where m.case_id = ${cases.id} and m.direction = 'inbound'
-          and m.seq = (select max(seq) from case_messages where case_id = ${cases.id})
-        )`,
-      ),
-    );
+    .where(and(inArray(cases.state, [...ANSWERABLE_STATES]), eq(cases.awaitingAgentReply, true)));
 
-  for (const caseRow of pending) {
+  await processWithConcurrency(roundRobinByTenant(pending), REPLY_CONCURRENCY, async (caseRow) => {
     try {
       const thread = await db
         .select()
@@ -88,28 +85,29 @@ export async function processAgentReplies({ loadReplyContext }: AgentReplyDeps):
         .orderBy(asc(caseMessages.seq));
 
       const latest = thread[thread.length - 1];
-      if (!latest || latest.direction !== "inbound") continue;
+      if (!latest || latest.direction !== "inbound") return;
 
       if (caseRow.replyCount >= MAX_AGENT_REPLIES) {
         await escalate(caseRow, "agent_reply_limit_reached");
-        continue;
+        return;
       }
 
       const ctx = await loadReplyContext(caseRow.id);
-      if (!ctx.smtp) continue;
+      if (!ctx.smtp) return;
 
       // A reply is still outbound contact, so it answers to the same policy
       // the ladder does; without this the agent would write at 3am, past the
       // daily cap, or after the circuit breaker paused the tenant.
-      if (ctx.customerSuppressed) continue;
-      if (ctx.tenantPaused || !ctx.withinDailyCap) continue;
-      if (!isWithinContactWindow(ctx.localHour)) continue;
+      if (ctx.customerSuppressed) return;
+      if (ctx.tenantPaused || !ctx.withinDailyCap) return;
+      if (!isWithinContactWindow(ctx.localHour)) return;
 
       const history: ConversationTurn[] = thread.slice(0, -1).map((m) => ({
         role: m.direction === "inbound" ? "customer" : "agent",
         text: m.body,
       }));
 
+      await llmRateLimiter.acquire();
       const reasoning = await reasonReply(model, {
         customerName: ctx.customerName,
         customerMessage: latest.body,
@@ -125,14 +123,18 @@ export async function processAgentReplies({ loadReplyContext }: AgentReplyDeps):
         .where(eq(caseMessages.id, latest.id));
 
       if (!reasoning.replyText) {
-        if (reasoning.needsHuman) await escalate(caseRow, `agent_deferred:${reasoning.intent}`);
-        continue;
+        if (reasoning.needsHuman) {
+          await escalate(caseRow, `agent_deferred:${reasoning.intent}`);
+        } else {
+          await db.update(cases).set({ awaitingAgentReply: false }).where(eq(cases.id, caseRow.id));
+        }
+        return;
       }
 
       const validation = validateReply(reasoning.replyText, [ctx.paymentUrl]);
       if (!validation.valid) {
         await escalate(caseRow, `agent_reply_rejected:${validation.failures[0]?.rule ?? "unknown"}`);
-        continue;
+        return;
       }
 
       const subject = latest.subject?.trim()
@@ -181,6 +183,7 @@ export async function processAgentReplies({ loadReplyContext }: AgentReplyDeps):
           .set({
             agentReplyCount: caseRow.replyCount + 1,
             state: transition.toState,
+            awaitingAgentReply: false,
             ...(promise ? { nextActionAt: promise.promisedFor } : {}),
           })
           .where(eq(cases.id, caseRow.id));
@@ -211,7 +214,7 @@ export async function processAgentReplies({ loadReplyContext }: AgentReplyDeps):
       const message = error instanceof Error ? error.message : String(error);
       process.stderr.write(`processAgentReplies: case ${caseRow.id} failed: ${message}\n`);
     }
-  }
+  });
 }
 
 async function escalate(
@@ -221,7 +224,7 @@ async function escalate(
   await db.transaction(async (tx) => {
     const claimed = await tx
       .update(cases)
-      .set({ state: "ESCALATED", closedAt: new Date(), closedReason: reason })
+      .set({ state: "ESCALATED", closedAt: new Date(), closedReason: reason, awaitingAgentReply: false })
       .where(and(eq(cases.id, caseRow.id), inArray(cases.state, [...ANSWERABLE_STATES])))
       .returning({ id: cases.id });
 

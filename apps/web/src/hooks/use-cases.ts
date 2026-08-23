@@ -29,8 +29,10 @@ export interface CaseListResponse {
 
 const PAGE_SIZE = 50;
 
-async function fetchCases(state: string, offset: number): Promise<CaseListResponse> {
+async function fetchCases(state: string, offset: number, from?: string, to?: string): Promise<CaseListResponse> {
   const params = new URLSearchParams({ state, offset: String(offset), limit: String(PAGE_SIZE) });
+  if (from) params.set("from", from);
+  if (to) params.set("to", to);
   const response = await fetch(`/api/cases?${params}`);
   if (!response.ok) {
     throw new Error(`Failed to load cases: ${response.status}`);
@@ -38,10 +40,10 @@ async function fetchCases(state: string, offset: number): Promise<CaseListRespon
   return response.json();
 }
 
-export function useCases(state = "ALL", offset = 0) {
+export function useCases(state = "ALL", offset = 0, from?: string, to?: string) {
   return useQuery({
-    queryKey: ["cases", state, offset],
-    queryFn: () => fetchCases(state, offset),
+    queryKey: ["cases", state, offset, from, to],
+    queryFn: () => fetchCases(state, offset, from, to),
     placeholderData: (prev) => prev,
     refetchOnWindowFocus: true,
     refetchInterval: (query) => {

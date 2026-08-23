@@ -1,13 +1,8 @@
 import { pgTable, text, timestamp, uuid, pgEnum, jsonb, boolean, integer, uniqueIndex } from "drizzle-orm/pg-core";
 import { organization } from "./auth.js";
 
-export const providerIdEnum = pgEnum("provider_id", ["stripe", "razorpay"]);
-export const connectionStatusEnum = pgEnum("connection_status", [
-  "active",
-  "revoked",
-  "expired",
-  "error",
-]);
+export const providerIdEnum = pgEnum("provider_id", ["razorpay"]);
+export const connectionStatusEnum = pgEnum("connection_status", ["active", "expired", "error"]);
 
 export const connections = pgTable("connections", {
   id: uuid("id").primaryKey().defaultRandom(),

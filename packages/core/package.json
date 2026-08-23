@@ -13,8 +13,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@riko/shared": "workspace:*",
-    "stripe": "^17.0.0"
+    "@riko/shared": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.7.0",

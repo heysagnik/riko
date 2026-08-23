@@ -27,6 +27,7 @@
   },
   "exports": {
     ".": "./src/index.ts",
-    "./run": "./src/run.ts"
+    "./run": "./src/run.ts",
+    "./mailer": "./src/lib/mailer.ts"
   }
 }

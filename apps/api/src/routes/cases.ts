@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { db, withTenant, cases, caseEvents, agentActions, caseMessages, customers, payments, exposures, outreach, verifyChainRows } from "@riko/db";
 import { caseListQuerySchema, caseIdParamSchema, resolveCaseStates, CASE_STATE_GROUPS } from "@riko/shared";
 import { requireTenant } from "../middleware/require-tenant.js";
@@ -11,9 +11,11 @@ casesRouter.get("/cases", requireTenant, async (req, res) => {
   const tenantId = req.tenant!.tenantId;
 
   const states = resolveCaseStates(query.state);
-  const scope = states
-    ? and(eq(cases.tenantId, tenantId), inArray(cases.state, [...states]))
-    : eq(cases.tenantId, tenantId);
+  const filters = [eq(cases.tenantId, tenantId)];
+  if (states) filters.push(inArray(cases.state, [...states]));
+  if (query.from) filters.push(gte(cases.openedAt, new Date(query.from)));
+  if (query.to) filters.push(lt(cases.openedAt, new Date(query.to)));
+  const scope = and(...filters);
 
   const { rows, total, counts } = await withTenant(db, tenantId, async (tx) => {
     const rows = await tx

@@ -119,6 +119,8 @@ inboundMailRouter.post("/inbound/mail", async (req, res) => {
       seq: maxSeq + 1,
     });
 
+    await db.update(cases).set({ awaitingAgentReply: true }).where(eq(cases.id, caseRow.id));
+
     res.json({ status: "queued_for_agent", caseId: caseRow.id, classification: classification.kind });
     return;
   }

@@ -10,28 +10,28 @@
 
 @layer base {
   :root {
-    --ink: 0 0% 9%;
-    --ink-secondary: 0 0% 25%;
-    --ink-muted: 0 0% 45%;
-    --ink-faint: 0 0% 60%;
+    --ink: 224 20% 12%;
+    --ink-secondary: 222 10% 28%;
+    --ink-muted: 222 8% 44%;
+    --ink-faint: 223 9% 60%;
     --surface: 0 0% 100%;
-    --surface-sunk: 0 0% 98%;
-    --surface-cream: 0 0% 96%;
-    --line: 0 0% 91%;
-    --line-strong: 0 0% 80%;
+    --surface-sunk: 220 20% 94.5%;
+    --surface-cream: 45 33% 96%;
+    --line: 222 14% 88%;
+    --line-strong: 222 10% 77%;
 
-    --accent: 0 0% 9%;
-    --accent-hover: 0 0% 20%;
-    --accent-press: 0 0% 15%;
-    --accent-soft: 0 0% 94%;
+    --accent: 224 26% 13%;
+    --accent-hover: 224 20% 22%;
+    --accent-press: 224 24% 17%;
+    --accent-soft: 222 16% 93%;
     --accent-foreground: 0 0% 100%;
 
-    --brand-dark: 0 0% 9%;
+    --brand-dark: 224 20% 12%;
 
-    --recovered: 142 71% 40%;
-    --waiting: 38 92% 45%;
-    --lost: 0 72% 48%;
-    --skipped: 0 0% 45%;
+    --recovered: 150 62% 34%;
+    --waiting: 36 92% 42%;
+    --lost: 2 70% 47%;
+    --skipped: 222 7% 44%;
   }
 
   :root[data-theme="dark"] {
@@ -93,6 +93,20 @@
   body {
     @apply bg-surface text-ink antialiased font-sans;
     font-feature-settings: "ss01" 1;
+  }
+
+  select {
+    color-scheme: light;
+  }
+
+  :root[data-theme="dark"] select {
+    color-scheme: dark;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]):not([data-theme="dark"]) select {
+      color-scheme: dark;
+    }
   }
 
   .tabular-nums,

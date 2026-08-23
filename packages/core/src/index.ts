@@ -1,5 +1,4 @@
 export * from "./providers/types.js";
-export * from "./providers/stripe.js";
 export * from "./providers/razorpay.js";
 export * from "./providers/razorpay-payment-link.js";
 export * from "./providers/registry.js";

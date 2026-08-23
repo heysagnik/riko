@@ -1,4 +1,4 @@
-export type ProviderId = "stripe" | "razorpay";
+export type ProviderId = "razorpay";
 
 export type FailureCategory =
   | "insufficient_funds"

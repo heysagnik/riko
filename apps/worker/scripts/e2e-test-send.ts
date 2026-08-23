@@ -18,7 +18,7 @@ async function main() {
     .insert(connections)
     .values({
       tenantId,
-      providerId: "stripe",
+      providerId: "razorpay",
       providerAccountId: "e2e-test-account",
       accessTokenEncrypted: encryptSecret("e2e-fake-token", key),
       webhookSecretEncrypted: encryptSecret("e2e-fake-secret", key),
@@ -29,7 +29,7 @@ async function main() {
     .insert(customers)
     .values({
       tenantId,
-      providerId: "stripe",
+      providerId: "razorpay",
       providerCustomerId: "e2e-test-customer",
       emailEncrypted: encryptSecret(TO_EMAIL, key),
       name: "E2E Test Customer",

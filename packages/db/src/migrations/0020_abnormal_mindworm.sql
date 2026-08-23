@@ -1,0 +1,1 @@
+ALTER TABLE "cases" ADD COLUMN "awaiting_agent_reply" boolean DEFAULT false NOT NULL;

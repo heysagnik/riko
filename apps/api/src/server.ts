@@ -4,7 +4,6 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { toNodeHandler } from "better-auth/node";
 import { auth } from "./auth.js";
-import { stripeWebhookRouter } from "./webhooks/stripe.js";
 import { razorpayWebhookRouter } from "./webhooks/razorpay.js";
 import { casesRouter } from "./routes/cases.js";
 import { metricsRouter } from "./routes/metrics.js";
@@ -34,8 +33,7 @@ app.get("/health", (_req, res) => {
   });
 });
 
-// Providers post here directly, so these stay off the /api prefix.
-app.use(stripeWebhookRouter);
+// Providers post here directly, so this stays off the /api prefix.
 app.use(razorpayWebhookRouter);
 
 app.all("/api/auth/*", toNodeHandler(auth));
