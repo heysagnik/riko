@@ -19,8 +19,19 @@ import { policyRouter } from "./routes/policy.js";
 
 const app = express();
 
+let getWorkerStatus: (() => Record<string, unknown>) | null = null;
+let workerBootError: string | null = null;
+
 app.get("/health", (_req, res) => {
-  res.json({ ok: true, at: new Date().toISOString() });
+  res.json({
+    ok: true,
+    at: new Date().toISOString(),
+    worker: {
+      enabled: process.env.RUN_WORKER === "1",
+      bootError: workerBootError,
+      ...(getWorkerStatus ? getWorkerStatus() : {}),
+    },
+  });
 });
 
 // Providers post here directly, so these stay off the /api prefix.
@@ -59,6 +70,14 @@ app.listen(port, () => {
 });
 
 if (process.env.RUN_WORKER === "1") {
-  const { runWorker } = await import("@riko/worker/run");
-  void runWorker();
+  try {
+    const { runWorker, workerStatus } = await import("@riko/worker/run");
+    getWorkerStatus = workerStatus;
+    void runWorker();
+  } catch (error) {
+    // A failed import must not take the API down with it, and must not be
+    // silent either: /health carries the reason the worker never started.
+    workerBootError = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`worker failed to start: ${workerBootError}\n`);
+  }
 }

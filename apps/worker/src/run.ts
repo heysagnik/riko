@@ -20,14 +20,36 @@ export async function tick(): Promise<void> {
   await processSendingCases(loadPendingOutreach);
 }
 
+// The worker runs inside the API process, where a stalled loop is invisible:
+// HTTP keeps answering while nothing is processed. /health reports these so a
+// stall is one request away from being diagnosed.
+let startedAt: string | null = null;
+let lastTickAt: string | null = null;
+let lastError: string | null = null;
+let tickCount = 0;
+
+export function workerStatus(): {
+  startedAt: string | null;
+  lastTickAt: string | null;
+  lastError: string | null;
+  tickCount: number;
+} {
+  return { startedAt, lastTickAt, lastError, tickCount };
+}
+
 export async function runWorker(): Promise<never> {
+  startedAt = new Date().toISOString();
   process.stdout.write(`worker polling every ${POLL_INTERVAL_MS}ms\n`);
   for (;;) {
     try {
       await tick();
+      lastError = null;
     } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error);
       process.stderr.write(`${error instanceof Error ? error.stack : String(error)}\n`);
     }
+    lastTickAt = new Date().toISOString();
+    tickCount += 1;
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
   }
 }
