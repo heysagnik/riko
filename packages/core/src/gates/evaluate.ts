@@ -12,13 +12,18 @@ const MAX_AGE_DAYS: Record<ExposureKind, number> = {
   overdue_receivable: 30,
 };
 
-// RBI's recovery-agent conduct norms bound contact to daytime hours. Email is
-// not a phone call, but holding to the same window costs nothing and keeps one
-// standard across every channel we might add.
-export const CONTACT_WINDOW_START_HOUR = Number(process.env.CONTACT_WINDOW_START_HOUR ?? 8);
-export const CONTACT_WINDOW_END_HOUR = Number(process.env.CONTACT_WINDOW_END_HOUR ?? 19);
+// Riko runs around the clock by default. RBI's recovery-agent conduct norms
+// bound *calls* to daytime hours; if you want email held to the same standard,
+// set these two and the gate comes back.
+export const CONTACT_WINDOW_START_HOUR = Number(process.env.CONTACT_WINDOW_START_HOUR ?? 0);
+export const CONTACT_WINDOW_END_HOUR = Number(process.env.CONTACT_WINDOW_END_HOUR ?? 24);
+
+export function contactWindowIsAllDay(): boolean {
+  return CONTACT_WINDOW_START_HOUR <= 0 && CONTACT_WINDOW_END_HOUR >= 24;
+}
 
 export function isWithinContactWindow(localHour: number): boolean {
+  if (contactWindowIsAllDay()) return true;
   return localHour >= CONTACT_WINDOW_START_HOUR && localHour < CONTACT_WINDOW_END_HOUR;
 }
 
@@ -64,7 +69,9 @@ export function describePolicyLimits(): PolicyLimit[] {
     {
       id: "contact_window",
       label: "Contact window",
-      value: `${CONTACT_WINDOW_START_HOUR}:00–${CONTACT_WINDOW_END_HOUR}:00 local`,
+      value: contactWindowIsAllDay()
+        ? "Any time, 24×7"
+        : `${CONTACT_WINDOW_START_HOUR}:00–${CONTACT_WINDOW_END_HOUR}:00 local`,
       group: "compliance",
     },
     { id: "incentives", label: "Discounts or credits offered", value: "Never", group: "compliance" },

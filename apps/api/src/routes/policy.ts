@@ -15,7 +15,6 @@ const STOPPING_RULES = [
   { id: "attempts_exhausted", label: "Three emails, no reply", detail: "The case is marked lost rather than escalated further." },
   { id: "customer_reply", label: "The customer writes back", detail: "Unless it contains a clear promise to pay, a person reads it next." },
   { id: "promise_to_pay", label: "The customer commits to a date", detail: "The ladder pauses until that date rather than climbing." },
-  { id: "outside_contact_window", label: "It is night where they are", detail: "Nothing sends outside 08:00-19:00 local time." },
   { id: "tenant_paused", label: "Opt-outs spike", detail: "Outreach pauses automatically across the whole tenant." },
 ];
 

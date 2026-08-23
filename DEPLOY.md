@@ -522,8 +522,8 @@ above. All optional ones have safe defaults for a demo.
 |---|---|---|---|
 | `INBOUND_REPLY_BASE` | For replies | none | Shared base reply address, e.g. `billing@reply.example.com`. Riko appends the per-case tag. Without it, mail carries no `Reply-To` and replies are unroutable. A tenant's own `reply_to` overrides it. |
 | `HOLDOUT_PERCENT` | No | `5` | % of cases held back as the uncontacted control group |
-| `CONTACT_WINDOW_START_HOUR` | No | `8` | Local hour outreach may start |
-| `CONTACT_WINDOW_END_HOUR` | No | `19` | Local hour outreach must stop by |
+| `CONTACT_WINDOW_START_HOUR` | No | `0` | Local hour outreach may start. Default is 24×7; set with the pair below to restrict. |
+| `CONTACT_WINDOW_END_HOUR` | No | `24` | Local hour outreach must stop by. Leave unset for round-the-clock sending. |
 | `DEFAULT_CUSTOMER_TIMEZONE` | No | `Asia/Kolkata` | Fallback when a customer has no stored timezone |
 | `UNSUBSCRIBE_RATE_LIMIT` | No | `0.1` | Opt-out rate per send that trips the circuit breaker |
 | `COST_PER_SEND_MINOR` | No | `0` | Assumed cost per email, for the net-recovered metric |
