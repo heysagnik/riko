@@ -10,6 +10,7 @@ export * from "./interventions/route.js";
 export * from "./outreach/brand-template.js";
 export * from "./inbound/classify.js";
 export * from "./inbound/address-tag.js";
+export * from "./inbound/strip-quote.js";
 export * from "./promises/extract.js";
 export * from "./normalize/failure-code.js";
 export * from "./crypto/encryption.js";

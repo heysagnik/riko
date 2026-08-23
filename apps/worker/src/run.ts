@@ -4,6 +4,8 @@ import { processCircuitBreaker } from "./jobs/process-circuit-breaker.js";
 import { processNewCases } from "./jobs/process-new-cases.js";
 import { processDraftingCases } from "./jobs/process-drafting-cases.js";
 import { processSendingCases } from "./jobs/process-sending-cases.js";
+import { processAgentReplies } from "./jobs/process-agent-replies.js";
+import { loadReplyContext } from "./loaders/load-reply-context.js";
 import { loadGateInput } from "./loaders/load-gate-input.js";
 import { loadRouteInput } from "./loaders/load-route-input.js";
 import { loadCaseFacts } from "./loaders/load-case-facts.js";
@@ -18,6 +20,7 @@ export async function tick(): Promise<void> {
   await processNewCases({ loadGateInput, loadRouteInput });
   await processDraftingCases(loadCaseFacts);
   await processSendingCases(loadPendingOutreach);
+  await processAgentReplies({ loadPendingOutreach, loadReplyContext });
 }
 
 // The worker runs inside the API process, where a stalled loop is invisible:

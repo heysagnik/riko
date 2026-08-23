@@ -19,19 +19,19 @@ const draftSchema = z.object({
  */
 const RUNG_EXEMPLAR: Record<string, string> = {
   instrument_fix: `Subject: Your card ending 4242 was declined
-Body: Hi Sam, the card we have on file for your Acme subscription expired, so this month's USD 29.00 payment did not go through. Nothing has been cancelled - updating your card takes about a minute and everything picks up where it left off. Update your payment method: https://example.com/pay/xyz. If you have already sorted this out, you can ignore this email. Unsubscribe: https://example.com/unsub/xyz`,
+Body: Hi Sam, the card we have on file for your Acme subscription expired, so this month's INR 2400.00 payment did not go through. Nothing has been cancelled - updating your card takes about a minute and everything picks up where it left off. Update your payment method: https://example.com/pay/xyz. If you have already sorted this out, you can ignore this email. Unsubscribe: https://example.com/unsub/xyz`,
 
   resume_checkout: `Subject: Your Acme order is still waiting
-Body: Hi Sam, you left an order with us for USD 29.00 and it is still saved. If you would like to finish it, everything is where you left it and it only takes a moment. Complete your order: https://example.com/pay/xyz. If you have changed your mind that is completely fine, and no further action is needed. Unsubscribe: https://example.com/unsub/xyz`,
+Body: Hi Sam, you left an order with us for INR 2400.00 and it is still saved. If you would like to finish it, everything is where you left it and it only takes a moment. Complete your order: https://example.com/pay/xyz. If you have changed your mind that is completely fine, and no further action is needed. Unsubscribe: https://example.com/unsub/xyz`,
 
-  reminder: `Subject: Invoice for USD 29.00 is now due
-Body: Hi Sam, a quick note that your Acme invoice for USD 29.00 passed its due date yesterday. These things slip through easily, so this is just a nudge in case it went unnoticed. You can settle it here: https://example.com/pay/xyz. If payment is already on its way, please ignore this. Unsubscribe: https://example.com/unsub/xyz`,
+  reminder: `Subject: Invoice for INR 2400.00 is now due
+Body: Hi Sam, a quick note that your Acme invoice for INR 2400.00 passed its due date yesterday. These things slip through easily, so this is just a nudge in case it went unnoticed. You can settle it here: https://example.com/pay/xyz. If payment is already on its way, please ignore this. Unsubscribe: https://example.com/unsub/xyz`,
 
-  firm: `Subject: Invoice for USD 29.00 remains unpaid
-Body: Hi Sam, your Acme invoice for USD 29.00 is now eight days past its due date and we have not yet received payment. Could you either settle it here: https://example.com/pay/xyz, or reply with the date you expect to pay. If something is holding this up, let us know and we will work with you. Unsubscribe: https://example.com/unsub/xyz`,
+  firm: `Subject: Invoice for INR 2400.00 remains unpaid
+Body: Hi Sam, your Acme invoice for INR 2400.00 is now eight days past its due date and we have not yet received payment. Could you either settle it here: https://example.com/pay/xyz, or reply with the date you expect to pay. If something is holding this up, let us know and we will work with you. Unsubscribe: https://example.com/unsub/xyz`,
 
-  formal: `Subject: Overdue invoice for USD 29.00 requires attention
-Body: Hi Sam, this concerns your Acme invoice for USD 29.00, which fell due on 1 August and remains unpaid after two previous requests. We are asking that you either make payment here: https://example.com/pay/xyz, or contact us directly to arrange settlement. Please treat this as a matter requiring your attention. Unsubscribe: https://example.com/unsub/xyz`,
+  formal: `Subject: Overdue invoice for INR 2400.00 requires attention
+Body: Hi Sam, this concerns your Acme invoice for INR 2400.00, which fell due on 1 August and remains unpaid after two previous requests. We are asking that you either make payment here: https://example.com/pay/xyz, or contact us directly to arrange settlement. Please treat this as a matter requiring your attention. Unsubscribe: https://example.com/unsub/xyz`,
 };
 
 function exemplarFor(facts: CaseFacts): string {

@@ -1,13 +1,14 @@
 import { Router } from "express";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
-import { db, cases, customers, outreach, promises, appendCaseEvent } from "@riko/db";
+import { db, cases, customers, outreach, promises, caseMessages, appendCaseEvent } from "@riko/db";
 import {
   applyTransition,
   classifyInbound,
   extractMessageIds,
   caseIdFromRecipient,
   extractPromise,
+  stripQuotedContent,
   MIN_PROMISE_CONFIDENCE,
 } from "@riko/core";
 
@@ -44,7 +45,10 @@ inboundMailRouter.post("/inbound/mail", async (req, res) => {
     return;
   }
 
-  const message = parsed.data;
+  // Clients quote the original below a reply, and every outbound email ends in
+  // an unsubscribe footer - classifying the raw body reads that footer as the
+  // customer's own words.
+  const message = { ...parsed.data, text: stripQuotedContent(parsed.data.text) };
   const classification = classifyInbound(message);
   const messageIds = extractMessageIds(message);
 
@@ -96,6 +100,28 @@ inboundMailRouter.post("/inbound/mail", async (req, res) => {
       ? extractPromise(message.text)
       : null;
   const usablePromise = promise && promise.confidence >= MIN_PROMISE_CONFIDENCE ? promise : null;
+
+  // A plain reply is now a conversation turn: record it and let the agent
+  // answer on the next tick, rather than handing every reply to a person.
+  if (classification.kind === "reply" && !usablePromise) {
+    const [seqRow] = await db
+      .select({ maxSeq: sql<number>`coalesce(max(${caseMessages.seq}), -1)::int` })
+      .from(caseMessages)
+      .where(eq(caseMessages.caseId, caseRow.id));
+    const maxSeq = seqRow?.maxSeq ?? -1;
+
+    await db.insert(caseMessages).values({
+      tenantId: caseRow.tenantId,
+      caseId: caseRow.id,
+      direction: "inbound",
+      body: message.text,
+      subject: message.subject,
+      seq: maxSeq + 1,
+    });
+
+    res.json({ status: "queued_for_agent", caseId: caseRow.id, classification: classification.kind });
+    return;
+  }
 
   const trigger =
     classification.kind === "hard_bounce"

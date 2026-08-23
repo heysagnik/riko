@@ -6,3 +6,4 @@ export * from "./exposures.js";
 export * from "./cases.js";
 export * from "./outreach.js";
 export * from "./promises.js";
+export * from "./conversation.js";
