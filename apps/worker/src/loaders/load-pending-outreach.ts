@@ -3,6 +3,8 @@ import { db, outreach, cases, customers, organization, senderIdentities } from "
 import { decryptSecret, renderBrandTemplate, taggedReplyTo } from "@riko/core";
 import type { SendableOutreach } from "../jobs/process-sending-cases.js";
 
+const INBOUND_REPLY_BASE = process.env.INBOUND_REPLY_BASE ?? null;
+
 function escapeHtml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
@@ -63,11 +65,16 @@ export async function loadPendingOutreach(caseId: string): Promise<SendableOutre
         }
       : null;
 
+  // Replies land on shared infrastructure, not the merchant's domain: the
+  // case-id tag already identifies the tenant, so one inbox serves everyone.
+  // A tenant-set reply_to still wins, but it must be a domain we receive on.
+  const replyToBase = sender.replyTo ?? INBOUND_REPLY_BASE;
+
   return {
     outreachId: pending.id,
     fromEmail: sender.fromEmail,
     fromName: sender.fromName,
-    replyTo: sender.replyTo ? taggedReplyTo(sender.replyTo, caseId) : null,
+    replyTo: replyToBase ? taggedReplyTo(replyToBase, caseId) : null,
     toEmail: decryptSecret(customer.emailEncrypted, requireEncryptionKey()),
     subject: pending.subject,
     bodyText: pending.body,

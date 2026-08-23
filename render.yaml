@@ -23,6 +23,9 @@ services:
         sync: false
       - key: INBOUND_MAIL_SECRET
         sync: false
+      # Shared reply domain; must match the Email Routing zone.
+      - key: INBOUND_REPLY_BASE
+        sync: false
       # Both must be the service's own public URL once Render assigns it.
       - key: BETTER_AUTH_URL
         sync: false

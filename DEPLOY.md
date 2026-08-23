@@ -520,6 +520,7 @@ above. All optional ones have safe defaults for a demo.
 
 | Variable | Required | Default | Effect |
 |---|---|---|---|
+| `INBOUND_REPLY_BASE` | For replies | none | Shared base reply address, e.g. `billing@reply.example.com`. Riko appends the per-case tag. Without it, mail carries no `Reply-To` and replies are unroutable. A tenant's own `reply_to` overrides it. |
 | `HOLDOUT_PERCENT` | No | `5` | % of cases held back as the uncontacted control group |
 | `CONTACT_WINDOW_START_HOUR` | No | `8` | Local hour outreach may start |
 | `CONTACT_WINDOW_END_HOUR` | No | `19` | Local hour outreach must stop by |
