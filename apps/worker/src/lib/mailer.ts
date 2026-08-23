@@ -26,6 +26,9 @@ export function getTransporterForSmtpConfig(config: SmtpConfig): Transporter {
     port: config.port,
     secure: config.secure,
     auth: { user: config.user, pass: config.password },
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
   });
   transporterCache.set(key, transporter);
   return transporter;
