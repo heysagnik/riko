@@ -109,6 +109,9 @@ async function upsertCustomer(
       providerId: event.providerId,
       providerCustomerId: event.providerCustomerId,
       emailEncrypted: encryptSecret(event.providerCustomerEmail ?? event.providerCustomerId, encryptionKey),
+      phoneEncrypted: event.providerCustomerContact
+        ? encryptSecret(event.providerCustomerContact, encryptionKey)
+        : null,
       name: event.providerCustomerName,
       locale: null,
     })

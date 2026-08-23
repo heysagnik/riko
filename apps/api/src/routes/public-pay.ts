@@ -89,7 +89,7 @@ async function resolvePayLink(rawCaseId: unknown): Promise<PayLinkOk | PayLinkEr
       description: `${merchantName} — ${amount}`,
       customerName: customer.name,
       customerEmail: decryptSecret(customer.emailEncrypted, key),
-      customerContact: null,
+      customerContact: customer.phoneEncrypted ? decryptSecret(customer.phoneEncrypted, key) : null,
       notes: { case_id: caseRow.id, tenant_id: caseRow.tenantId },
     });
 

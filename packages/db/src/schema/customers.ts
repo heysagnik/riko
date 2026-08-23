@@ -8,6 +8,7 @@ export const customers = pgTable("customers", {
   providerId: providerIdEnum("provider_id").notNull(),
   providerCustomerId: text("provider_customer_id").notNull(),
   emailEncrypted: text("email_encrypted").notNull(),
+  phoneEncrypted: text("phone_encrypted"),
   name: text("name"),
   locale: text("locale"),
   unsubscribedAt: timestamp("unsubscribed_at", { withTimezone: true }),
