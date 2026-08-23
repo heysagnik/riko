@@ -24,8 +24,7 @@ export function isFraudSignal(failureCode: string | null): boolean {
   return FRAUD_CODES.some((f) => code.includes(f));
 }
 
-// Cards decline for want of balance far more often than for want of a card, so
-// a retry lands better just after payday than immediately.
+
 export function nextSalaryWindow(from: Date): Date {
   const candidate = new Date(from);
   candidate.setUTCHours(4, 0, 0, 0);
@@ -55,7 +54,11 @@ export function routePaymentFailure(input: InterventionInput): Intervention {
     }
   }
 
-  if (input.failureCategory === "network_error" || TRANSIENT_SOURCES.includes(input.failureSource)) {
+
+  if (
+    input.failureCategory !== "unknown" &&
+    (input.failureCategory === "network_error" || TRANSIENT_SOURCES.includes(input.failureSource))
+  ) {
     return {
       kind: "no_action_provider_retrying",
       reason: "transient_fault_card_is_healthy",

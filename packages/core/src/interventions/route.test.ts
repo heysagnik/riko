@@ -93,6 +93,14 @@ describe("routeIntervention", () => {
     expect(result.reason).toBe("above_human_review_threshold");
   });
 
+  it("escalates an unmapped code even when the gateway is the reported source", () => {
+    const result = routeIntervention(
+      input({ failureCategory: "unknown", failureSource: "gateway", failureCode: "bad_request_error" }),
+    );
+    expect(result.kind).toBe("escalate_human");
+    expect(result.reason).toBe("unmapped_failure_code");
+  });
+
   it("escalates rather than guessing at an unmapped code", () => {
     const result = routeIntervention(
       input({ failureCategory: "unknown", failureSource: "unknown", failureCode: "weird_new_code" }),
