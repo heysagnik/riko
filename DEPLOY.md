@@ -325,6 +325,23 @@ throughout this guide) is free.
 
 ## Troubleshooting
 
+**`ERR_PNPM_NO_SCRIPT_OR_SERVER: Missing script start`.** The service was
+created as a plain **Web Service** rather than a **Blueprint**, so Render
+ignored `render.yaml` and fell back to its own defaults — `pnpm run build`
+then `pnpm run start` against the repo root, and the root `package.json` used
+to have neither a matching `build` nor a `start` script.
+
+Both now exist at the root and do the right thing (`build` builds the
+dashboard and runs migrations; `start` launches the API), so this is fixed
+going forward whichever way the service was created. If you already have a
+service stuck on the old commands, either:
+
+- **Delete it and recreate via Blueprint** (Dashboard → New → Blueprint →
+  same repo) so `render.yaml`'s explicit commands apply, or
+- **Fix the existing service in place**: Settings → Build & Deploy → set
+  Build Command to `pnpm install --frozen-lockfile && pnpm run build` and
+  Start Command to `pnpm run start`, then Manual Deploy → Deploy latest commit.
+
 **Sign-in 500s immediately after first deploy.** `BETTER_AUTH_URL` isn't set
 yet — see step 5.
 
