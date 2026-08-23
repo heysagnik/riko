@@ -69,6 +69,15 @@ export default {
       throw new Error(`Riko inbound returned ${response.status}`);
     }
 
+    // A 4xx (usually a secret mismatch) is silent otherwise: the function
+    // returns normally and the tail log reads "Ok" exactly like a real
+    // success, hiding a misconfiguration behind what looks like delivery.
+    if (response.status >= 400) {
+      const text = await response.text().catch(() => "");
+      console.error(`Riko inbound rejected the message: ${response.status} ${text}`);
+      return;
+    }
+
     const result = (await response.json().catch(() => null)) as { status?: string } | null;
 
     if (result?.status === "ignored" && env.FORWARD_UNMATCHED_TO) {
