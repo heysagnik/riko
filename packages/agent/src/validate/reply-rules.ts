@@ -46,6 +46,12 @@ function wordCount(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
+// Trailing sentence punctuation is not part of the URL; without stripping it a
+// correctly written "... pay at https://x/y." fails the allowlist.
+function extractUrls(text: string): string[] {
+  return (text.match(/https?:\/\/[^\s"'<>]+/g) ?? []).map((url) => url.replace(/[.,;:!?)\]]+$/, ""));
+}
+
 export function validateReply(replyText: string, allowedUrls: string[]): ReplyValidationResult {
   const failures: ReplyValidationFailure[] = [];
 
@@ -64,7 +70,7 @@ export function validateReply(replyText: string, allowedUrls: string[]): ReplyVa
   }
 
   const allowed = new Set(allowedUrls);
-  for (const url of replyText.match(/https?:\/\/[^\s<>")]+/g) ?? []) {
+  for (const url of extractUrls(replyText)) {
     if (!allowed.has(url)) {
       failures.push({ rule: "url_allowlist", detail: `Unexpected URL in reply: ${url}` });
     }

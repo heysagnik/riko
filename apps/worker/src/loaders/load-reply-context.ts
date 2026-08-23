@@ -1,6 +1,22 @@
-import { eq } from "drizzle-orm";
-import { db, cases, customers, exposures, organization, senderIdentities } from "@riko/db";
+import { and, eq, gte, isNotNull, sql } from "drizzle-orm";
+import { db, cases, customers, exposures, organization, outreach, senderIdentities } from "@riko/db";
 import { decryptSecret, taggedReplyTo } from "@riko/core";
+
+const DEFAULT_TIMEZONE = process.env.DEFAULT_CUSTOMER_TIMEZONE ?? "Asia/Kolkata";
+
+function localHourFor(timezone: string | null): number {
+  try {
+    return Number(
+      new Intl.DateTimeFormat("en-GB", {
+        timeZone: timezone ?? DEFAULT_TIMEZONE,
+        hour: "numeric",
+        hour12: false,
+      }).format(new Date()),
+    );
+  } catch {
+    return new Date().getHours();
+  }
+}
 
 const INBOUND_REPLY_BASE = process.env.INBOUND_REPLY_BASE ?? null;
 const APP_BASE_URL = process.env.APP_BASE_URL ?? "https://app.example.com";
@@ -44,8 +60,21 @@ export async function loadReplyContext(caseId: string) {
         }
       : null;
 
+  const since = new Date();
+  since.setHours(0, 0, 0, 0);
+  const [sentToday] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(outreach)
+    .where(
+      and(eq(outreach.tenantId, caseRow.tenantId), isNotNull(outreach.sentAt), gte(outreach.sentAt, since)),
+    );
+
   return {
     customerName: customer.name ?? "there",
+    localHour: localHourFor(customer.timezone),
+    customerSuppressed: Boolean(customer.suppressedAt || customer.unsubscribedAt || customer.bouncedAt),
+    tenantPaused: sender.outreachPaused,
+    withinDailyCap: (sentToday?.count ?? 0) < sender.dailySendCap,
     amountLabel: `${currency} ${(amountMinor / 100).toFixed(2)}`,
     merchantName: tenant?.name ?? sender.fromName,
     paymentUrl: `${APP_BASE_URL}/pay/${caseId}`,

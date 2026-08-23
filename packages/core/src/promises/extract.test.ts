@@ -60,3 +60,26 @@ describe("extractPromise", () => {
     expect(vague!.confidence).toBeLessThan(named!.confidence);
   });
 });
+
+describe("hour-scale promises", () => {
+  it("captures 'in 1 hr' rather than dropping the fastest promise there is", () => {
+    const p = extractPromise("I will pay you in 1 hr. Thanks for your patience.");
+    expect(p).not.toBeNull();
+    expect(p!.confidence).toBeGreaterThanOrEqual(MIN_PROMISE_CONFIDENCE);
+    const hours = (p!.promisedFor.getTime() - Date.now()) / 3_600_000;
+    expect(hours).toBeGreaterThan(0.5);
+    expect(hours).toBeLessThan(2);
+  });
+
+  it("captures 'in an hour'", () => {
+    expect(extractPromise("will pay in an hour")).not.toBeNull();
+  });
+
+  it("captures 'tonight'", () => {
+    expect(extractPromise("I will pay tonight")).not.toBeNull();
+  });
+
+  it("still ignores a request for more time", () => {
+    expect(extractPromise("I have no money give me 2 days of time")).toBeNull();
+  });
+});

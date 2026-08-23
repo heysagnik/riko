@@ -24,8 +24,7 @@ export const cases = pgTable("cases", {
   customerId: uuid("customer_id").notNull().references(() => customers.id, { onDelete: "cascade" }),
   state: caseStateEnum("state").notNull().default("NEW"),
   attemptCount: integer("attempt_count").notNull().default(0),
-  // Bounds the agent's own back-and-forth on a reply, separate from the
-  // outbound ladder's attemptCount, so a chatty customer can't loop forever.
+  // Separate from attemptCount so a chatty customer cannot loop forever.
   agentReplyCount: integer("agent_reply_count").notNull().default(0),
   nextActionAt: timestamp("next_action_at", { withTimezone: true }),
   intervention: text("intervention"),

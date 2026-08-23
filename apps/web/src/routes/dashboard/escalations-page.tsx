@@ -7,13 +7,30 @@ import { formatAmount } from "../../hooks/use-cases.js";
 import { useEscalations, useResolveEscalation, type Escalation, type ResolveAction } from "../../hooks/use-escalations.js";
 import { failureLabel, reasonLabel } from "../../lib/labels.js";
 
-function Row({ item, currency }: { item: Escalation; currency: string }) {
+const OUTCOME_TEXT: Record<string, string> = {
+  SENDING: "Approved. Riko is sending the draft now.",
+  NEW: "Back with Riko. It will pick this up on the next run.",
+  LOST: "Written off. Riko will not contact them again.",
+};
+
+function Row({
+  item,
+  currency,
+  onResolved,
+}: {
+  item: Escalation;
+  currency: string;
+  onResolved: (item: Escalation, state: string) => void;
+}) {
   const resolve = useResolveEscalation();
   const [error, setError] = useState<string | null>(null);
 
   const act = (action: ResolveAction) => {
     setError(null);
-    resolve.mutate({ caseId: item.id, action }, { onError: (e) => setError(e.message) });
+    resolve.mutate(
+      { caseId: item.id, action },
+      { onSuccess: (result) => onResolved(item, result.state), onError: (e) => setError(e.message) },
+    );
   };
 
   const busy = resolve.isPending;
@@ -59,11 +76,54 @@ function Row({ item, currency }: { item: Escalation; currency: string }) {
   );
 }
 
+function ResolvedRow({
+  item,
+  state,
+  currency,
+}: {
+  item: Escalation;
+  state: string;
+  currency: string;
+}) {
+  return (
+    <li className="border-b border-line py-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <Link
+          to={`/dashboard/cases/${item.id}`}
+          className="text-sm font-medium text-ink-muted transition-colors duration-150 hover:text-accent"
+        >
+          {item.customerName ?? "Unknown customer"}
+        </Link>
+        <span className="text-figure tabular-nums text-ink-muted">
+          {formatAmount(item.amountMinor, item.currency ?? currency)}
+        </span>
+      </div>
+
+      <p className="mt-1.5 flex flex-wrap items-center gap-x-2 text-sm text-ink">
+        <Badge variant="default">{state}</Badge>
+        {OUTCOME_TEXT[state] ?? "Resolved."}
+      </p>
+
+      <Link
+        to={`/dashboard/cases/${item.id}`}
+        className="mt-1.5 inline-block text-caption text-accent transition-colors duration-150 hover:text-accent-hover"
+      >
+        View case
+      </Link>
+    </li>
+  );
+}
+
 export function EscalationsPage() {
   const { data, isLoading, error, refetch, isRefetching } = useEscalations();
+  const [resolved, setResolved] = useState<{ item: Escalation; state: string }[]>([]);
 
-  const escalations = data?.escalations ?? [];
+  const resolvedIds = new Set(resolved.map((r) => r.item.id));
+  const escalations = (data?.escalations ?? []).filter((e) => !resolvedIds.has(e.id));
   const currency = data?.currency ?? "inr";
+
+  const onResolved = (item: Escalation, state: string) =>
+    setResolved((prev) => (prev.some((r) => r.item.id === item.id) ? prev : [{ item, state }, ...prev]));
 
   return (
     <div>
@@ -84,7 +144,7 @@ export function EscalationsPage() {
             {isRefetching ? "Retrying…" : "Try again"}
           </Button>
         </div>
-      ) : escalations.length === 0 ? (
+      ) : escalations.length === 0 && resolved.length === 0 ? (
         <div className="mt-10 border-t border-line pt-10">
           <p className="text-sm text-ink">Nothing waiting on you.</p>
           <p className="mt-1 text-sm text-ink-muted">
@@ -108,8 +168,11 @@ export function EscalationsPage() {
           </div>
 
           <ul className="mt-2">
+            {resolved.map((r) => (
+              <ResolvedRow key={r.item.id} item={r.item} state={r.state} currency={currency} />
+            ))}
             {escalations.map((item) => (
-              <Row key={item.id} item={item} currency={currency} />
+              <Row key={item.id} item={item} currency={currency} onResolved={onResolved} />
             ))}
           </ul>
         </>

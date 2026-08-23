@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
-import { db, withTenant, cases, caseEvents, agentActions, customers, payments, exposures, verifyChainRows } from "@riko/db";
+import { db, withTenant, cases, caseEvents, agentActions, caseMessages, customers, payments, exposures, outreach, verifyChainRows } from "@riko/db";
 import { caseListQuerySchema, caseIdParamSchema, resolveCaseStates, CASE_STATE_GROUPS } from "@riko/shared";
 import { requireTenant } from "../middleware/require-tenant.js";
 
@@ -80,7 +80,7 @@ casesRouter.get("/cases/:caseId", requireTenant, async (req, res) => {
       return null;
     }
 
-    const [events, actions, [customer], [exposureRow]] = await Promise.all([
+    const [events, actions, messages, outreachRows, [customer], [exposureRow]] = await Promise.all([
       tx
         .select()
         .from(caseEvents)
@@ -91,6 +91,16 @@ casesRouter.get("/cases/:caseId", requireTenant, async (req, res) => {
         .from(agentActions)
         .where(and(eq(agentActions.caseId, params.caseId), eq(agentActions.tenantId, tenantId)))
         .orderBy(agentActions.createdAt),
+      tx
+        .select()
+        .from(caseMessages)
+        .where(and(eq(caseMessages.caseId, params.caseId), eq(caseMessages.tenantId, tenantId)))
+        .orderBy(caseMessages.seq),
+      tx
+        .select()
+        .from(outreach)
+        .where(and(eq(outreach.caseId, params.caseId), eq(outreach.tenantId, tenantId)))
+        .orderBy(outreach.createdAt),
       tx.select().from(customers).where(eq(customers.id, caseRow.customerId)).limit(1),
       tx
         .select({ payment: payments, exposure: exposures })
@@ -106,6 +116,8 @@ casesRouter.get("/cases/:caseId", requireTenant, async (req, res) => {
       case: caseRow,
       events,
       actions,
+      messages,
+      scheduledDraft: outreachRows.find((o) => !o.sentAt) ?? null,
       customer,
       exposure: exposureRow?.exposure ?? null,
       payment: exposureRow?.payment ?? null,

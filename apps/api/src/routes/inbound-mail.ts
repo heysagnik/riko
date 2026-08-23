@@ -101,8 +101,7 @@ inboundMailRouter.post("/inbound/mail", async (req, res) => {
       : null;
   const usablePromise = promise && promise.confidence >= MIN_PROMISE_CONFIDENCE ? promise : null;
 
-  // A plain reply is now a conversation turn: record it and let the agent
-  // answer on the next tick, rather than handing every reply to a person.
+  // Answered by the agent on the next worker tick.
   if (classification.kind === "reply" && !usablePromise) {
     const [seqRow] = await db
       .select({ maxSeq: sql<number>`coalesce(max(${caseMessages.seq}), -1)::int` })
@@ -116,6 +115,7 @@ inboundMailRouter.post("/inbound/mail", async (req, res) => {
       direction: "inbound",
       body: message.text,
       subject: message.subject,
+      providerMessageId: message.headers?.["message-id"] ?? null,
       seq: maxSeq + 1,
     });
 

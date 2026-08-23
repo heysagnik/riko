@@ -25,6 +25,11 @@ describe("validateReply", () => {
     expect(result.failures.map((f) => f.rule)).toContain("no_liability_admission");
   });
 
+  it("accepts an allowed link followed by sentence punctuation", () => {
+    const result = validateReply(`Hi Sagnik, you can pay here: ${LINK}.`, [LINK]);
+    expect(result.valid).toBe(true);
+  });
+
   it("rejects a link that was not provided", () => {
     const result = validateReply("Hi Sagnik, pay at https://evil.example/pay", [LINK]);
     expect(result.failures.map((f) => f.rule)).toContain("url_allowlist");

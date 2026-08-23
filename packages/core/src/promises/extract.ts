@@ -75,6 +75,21 @@ interface DateHit {
 }
 
 function findDate(text: string, now: Date): DateHit | null {
+  // Hour-scale commitments are the fastest promises there are; without these
+  // "I'll pay in an hour" reads as no promise at all and the case stalls.
+  const inHours = text.match(/\bin (?:an?|\d{1,2})\s*(?:hr|hrs|hour|hours)\b/);
+  if (inHours) {
+    const digits = inHours[0].match(/\d{1,2}/);
+    const n = digits ? Number(digits[0]) : 1;
+    return { date: new Date(now.getTime() + n * 60 * 60 * 1000), precision: 0.9 };
+  }
+  if (/\b(?:right now|straight away|immediately|just now)\b/.test(text)) {
+    return { date: new Date(now.getTime() + 60 * 60 * 1000), precision: 0.85 };
+  }
+  if (/\b(?:tonight|this evening|later today)\b/.test(text)) {
+    return { date: new Date(now.getTime() + 6 * 60 * 60 * 1000), precision: 0.85 };
+  }
+
   if (/\btoday\b/.test(text)) return { date: atNoon(now), precision: 0.9 };
   if (/\btomorrow\b/.test(text)) return { date: atNoon(new Date(now.getTime() + DAY_MS)), precision: 0.9 };
 

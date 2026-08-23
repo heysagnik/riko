@@ -49,7 +49,29 @@ export const REASON_LABEL: Record<string, string> = {
   hard_bounce: "Email hard-bounced",
   customer_unsubscribed: "Customer unsubscribed",
   batch_reset: "Cleared by a batch run",
+  agent_answered: "Riko answered the customer",
+  agent_reply_limit_reached: "Handed over after too many replies",
+  promise_to_pay: "Customer promised to pay",
+  reply_after_promise: "Customer wrote again after promising",
+  promise_broken: "Promise date passed unpaid",
 };
+
+export const INTENT_LABEL: Record<string, string> = {
+  promise_to_pay: "Promised to pay",
+  already_paid: "Says already paid",
+  question: "Asked a question",
+  needs_more_time: "Needs more time",
+  payment_problem: "Payment did not work",
+  dispute: "Disputes the charge",
+  unsubscribe: "Asked to stop",
+  hostile: "Hostile",
+  other: "Other",
+};
+
+export function intentLabel(intent: string | null | undefined): string {
+  if (!intent) return "—";
+  return INTENT_LABEL[intent] ?? humanise(intent);
+}
 
 function humanise(slug: string): string {
   const words = slug.replace(/[_:]+/g, " ").trim();

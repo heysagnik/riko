@@ -5,6 +5,7 @@ import { processNewCases } from "./jobs/process-new-cases.js";
 import { processDraftingCases } from "./jobs/process-drafting-cases.js";
 import { processSendingCases } from "./jobs/process-sending-cases.js";
 import { processAgentReplies } from "./jobs/process-agent-replies.js";
+import { processScheduledDrafts } from "./jobs/process-scheduled-drafts.js";
 import { loadReplyContext } from "./loaders/load-reply-context.js";
 import { loadGateInput } from "./loaders/load-gate-input.js";
 import { loadRouteInput } from "./loaders/load-route-input.js";
@@ -18,6 +19,7 @@ export async function tick(): Promise<void> {
   await processExposureSweep();
   await processPromises();
   await processNewCases({ loadGateInput, loadRouteInput });
+  await processScheduledDrafts(loadCaseFacts);
   await processDraftingCases(loadCaseFacts);
   await processSendingCases(loadPendingOutreach);
   await processAgentReplies({ loadPendingOutreach, loadReplyContext });

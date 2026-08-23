@@ -23,6 +23,8 @@ export const outreach = pgTable("outreach", {
   body: text("body").notNull(),
   draftId: uuid("draft_id"),
   providerMessageId: text("provider_message_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  scheduledFor: timestamp("scheduled_for", { withTimezone: true }),
   sentAt: timestamp("sent_at", { withTimezone: true }),
   openedAt: timestamp("opened_at", { withTimezone: true }),
   clickedAt: timestamp("clicked_at", { withTimezone: true }),

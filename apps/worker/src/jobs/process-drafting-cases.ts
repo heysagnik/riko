@@ -1,7 +1,9 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { db, cases, agentActions, outreach, appendCaseEvent } from "@riko/db";
 import { applyTransition } from "@riko/core";
+
+const DRAFT_FRESH_MS = 12 * 60 * 60 * 1000;
 import { runDraftLoop } from "@riko/agent";
 import type { CaseFacts } from "@riko/shared";
 
@@ -24,6 +26,38 @@ export async function processDraftingCases(loadFacts: (caseId: string) => Promis
         .where(and(eq(cases.id, caseRow.id), eq(cases.state, "DRAFTING")))
         .limit(1);
       if (!stillDrafting) continue;
+
+      const [pending] = await db
+        .select({ id: outreach.id, createdAt: outreach.createdAt })
+        .from(outreach)
+        .where(and(eq(outreach.caseId, caseRow.id), isNull(outreach.sentAt)))
+        .limit(1);
+
+      if (pending) {
+        const fresh = Date.now() - pending.createdAt.getTime() < DRAFT_FRESH_MS;
+        if (fresh) {
+          const transition = applyTransition(caseRow.state, { type: "draft_valid" });
+          await db.transaction(async (tx) => {
+            const claimed = await tx
+              .update(cases)
+              .set({ state: transition.toState, closedAt: null, closedReason: transition.reason })
+              .where(and(eq(cases.id, caseRow.id), eq(cases.state, "DRAFTING")))
+              .returning({ id: cases.id });
+            if (claimed.length === 0) return;
+            await tx.update(outreach).set({ scheduledFor: null }).where(eq(outreach.id, pending.id));
+            await appendCaseEvent(tx, {
+              tenantId: caseRow.tenantId,
+              caseId: caseRow.id,
+              fromState: caseRow.state,
+              toState: transition.toState,
+              reason: "scheduled_draft_used",
+              actor: "agent",
+            });
+          });
+          continue;
+        }
+        await db.delete(outreach).where(eq(outreach.id, pending.id));
+      }
 
       const facts = await loadFacts(caseRow.id);
 

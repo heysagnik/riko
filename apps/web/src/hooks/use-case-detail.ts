@@ -21,6 +21,26 @@ interface AgentActionRow {
   createdAt: string;
 }
 
+interface CaseMessageRow {
+  id: string;
+  direction: "inbound" | "outbound";
+  body: string;
+  subject: string | null;
+  intent: string | null;
+  confidence: number | null;
+  rationale: string | null;
+  seq: number;
+  createdAt: string;
+}
+
+interface ScheduledDraft {
+  id: string;
+  subject: string;
+  body: string;
+  scheduledFor: string | null;
+  createdAt: string;
+}
+
 interface CustomerFacts {
   id: string;
   name: string | null;
@@ -54,6 +74,8 @@ interface CaseDetail {
   };
   events: CaseEventRow[];
   actions: AgentActionRow[];
+  messages: CaseMessageRow[];
+  scheduledDraft: ScheduledDraft | null;
   customer: CustomerFacts | null;
   payment: PaymentFacts | null;
   chain: {
@@ -87,4 +109,4 @@ export function useCaseDetail(caseId: string) {
   });
 }
 
-export type { CaseDetail, CaseEventRow, AgentActionRow };
+export type { CaseDetail, CaseEventRow, AgentActionRow, CaseMessageRow, ScheduledDraft };

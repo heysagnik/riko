@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { db, cases, caseMessages, appendCaseEvent } from "@riko/db";
-import { applyTransition } from "@riko/core";
+import { db, cases, caseMessages, promises, appendCaseEvent } from "@riko/db";
+import { applyTransition, isWithinContactWindow, extractPromise, MIN_PROMISE_CONFIDENCE } from "@riko/core";
 import { reasonReply, validateReply, type ConversationTurn } from "@riko/agent";
 import { getTransporterForSmtpConfig } from "../lib/mailer.js";
 import type { SendableOutreach } from "./process-sending-cases.js";
@@ -18,10 +18,40 @@ const MAX_AGENT_REPLIES = Number(process.env.MAX_AGENT_REPLIES ?? 5);
 
 const ANSWERABLE_STATES = ["WAITING", "PROMISED"] as const;
 
+function quoteLines(body: string): string {
+  return body
+    .split("\n")
+    .map((line) => `> ${line}`)
+    .join("\n");
+}
+
+function buildQuotedBody(
+  replyText: string,
+  thread: { direction: string; body: string; createdAt: Date }[],
+  customerName: string,
+  merchantName: string,
+): string {
+  const quoted = thread
+    .slice()
+    .reverse()
+    .map((turn) => {
+      const who = turn.direction === "inbound" ? customerName : merchantName;
+      const when = turn.createdAt.toUTCString();
+      return `On ${when}, ${who} wrote:\n${quoteLines(turn.body)}`;
+    })
+    .join("\n\n");
+
+  return quoted ? `${replyText}\n\n${quoted}` : replyText;
+}
+
 export interface AgentReplyDeps {
   loadPendingOutreach: (caseId: string) => Promise<SendableOutreach>;
   loadReplyContext: (caseId: string) => Promise<{
     customerName: string;
+    localHour: number;
+    customerSuppressed: boolean;
+    tenantPaused: boolean;
+    withinDailyCap: boolean;
     amountLabel: string;
     merchantName: string;
     paymentUrl: string;
@@ -68,6 +98,13 @@ export async function processAgentReplies({ loadReplyContext }: AgentReplyDeps):
       const ctx = await loadReplyContext(caseRow.id);
       if (!ctx.smtp) continue;
 
+      // A reply is still outbound contact, so it answers to the same policy
+      // the ladder does; without this the agent would write at 3am, past the
+      // daily cap, or after the circuit breaker paused the tenant.
+      if (ctx.customerSuppressed) continue;
+      if (ctx.tenantPaused || !ctx.withinDailyCap) continue;
+      if (!isWithinContactWindow(ctx.localHour)) continue;
+
       const history: ConversationTurn[] = thread.slice(0, -1).map((m) => ({
         role: m.direction === "inbound" ? "customer" : "agent",
         text: m.body,
@@ -98,15 +135,30 @@ export async function processAgentReplies({ loadReplyContext }: AgentReplyDeps):
         continue;
       }
 
+      const subject = latest.subject?.trim()
+        ? /^re:/i.test(latest.subject.trim())
+          ? latest.subject.trim()
+          : `Re: ${latest.subject.trim()}`
+        : ctx.subject;
+
+      const references = thread
+        .map((m) => m.providerMessageId)
+        .filter((id): id is string => Boolean(id));
+
       const info = await getTransporterForSmtpConfig(ctx.smtp).sendMail({
         from: `${ctx.fromName} <${ctx.fromEmail}>`,
         replyTo: ctx.replyTo ?? undefined,
         to: ctx.toEmail,
-        subject: ctx.subject,
-        text: reasoning.replyText,
+        subject,
+        text: buildQuotedBody(reasoning.replyText, thread, ctx.customerName, ctx.merchantName),
+        ...(latest.providerMessageId ? { inReplyTo: latest.providerMessageId } : {}),
+        ...(references.length > 0 ? { references } : {}),
       });
 
       const nextSeq = (latest.seq ?? 0) + 1;
+
+      const spoken = reasoning.intent === "promise_to_pay" ? extractPromise(latest.body) : null;
+      const promise = spoken && spoken.confidence >= MIN_PROMISE_CONFIDENCE ? spoken : null;
 
       await db.transaction(async (tx) => {
         await tx.insert(caseMessages).values({
@@ -114,24 +166,42 @@ export async function processAgentReplies({ loadReplyContext }: AgentReplyDeps):
           caseId: caseRow.id,
           direction: "outbound",
           body: reasoning.replyText!,
-          subject: ctx.subject,
+          subject,
           providerMessageId: info.messageId,
           seq: nextSeq,
         });
 
+        const transition = applyTransition(
+          caseRow.state,
+          promise ? { type: "promise_captured" } : { type: "agent_answered" },
+        );
+
         await tx
           .update(cases)
-          .set({ agentReplyCount: caseRow.replyCount + 1 })
+          .set({
+            agentReplyCount: caseRow.replyCount + 1,
+            state: transition.toState,
+            ...(promise ? { nextActionAt: promise.promisedFor } : {}),
+          })
           .where(eq(cases.id, caseRow.id));
 
-        const transition = applyTransition(caseRow.state, { type: "agent_answered" });
+        if (promise) {
+          await tx.insert(promises).values({
+            tenantId: caseRow.tenantId,
+            caseId: caseRow.id,
+            promisedFor: promise.promisedFor,
+            amountMinor: promise.amountMinor,
+            confidence: promise.confidence,
+            sourceText: promise.sourceText,
+          });
+        }
 
         await appendCaseEvent(tx, {
           tenantId: caseRow.tenantId,
           caseId: caseRow.id,
           fromState: caseRow.state,
           toState: transition.toState,
-          reason: `agent_replied:${reasoning.intent}`,
+          reason: promise ? "promise_to_pay" : `agent_replied:${reasoning.intent}`,
           actor: "agent",
         });
       });

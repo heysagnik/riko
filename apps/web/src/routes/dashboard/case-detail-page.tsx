@@ -11,9 +11,9 @@ import { Badge } from "../../components/ui/badge.js";
 import { Button } from "../../components/ui/button.js";
 import { Skeleton } from "../../components/ui/skeleton.js";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip.js";
-import { useCaseDetail, type AgentActionRow, type CaseEventRow } from "../../hooks/use-case-detail.js";
+import { useCaseDetail, type AgentActionRow, type CaseEventRow, type CaseMessageRow } from "../../hooks/use-case-detail.js";
 import { formatAmount } from "../../hooks/use-cases.js";
-import { failureLabel, interventionLabel, INTERVENTION_TONE, reasonLabel } from "../../lib/labels.js";
+import { failureLabel, intentLabel, interventionLabel, INTERVENTION_TONE, reasonLabel } from "../../lib/labels.js";
 import { cn } from "../../lib/utils.js";
 
 const STATE_SENTENCE: Record<CaseUiState, string> = {
@@ -79,7 +79,8 @@ function DraftCard({ draft, sent }: { draft: EmailDraftOutput; sent: boolean }) 
 
 type Entry =
   | { kind: "event"; at: string; item: CaseEventRow }
-  | { kind: "action"; at: string; item: AgentActionRow };
+  | { kind: "action"; at: string; item: AgentActionRow }
+  | { kind: "message"; at: string; item: CaseMessageRow };
 
 function AgentWork({ entries, sentSubject }: { entries: Entry[]; sentSubject: string | null }) {
   const [open, setOpen] = useState(false);
@@ -175,6 +176,37 @@ function AgentWork({ entries, sentSubject }: { entries: Entry[]; sentSubject: st
   );
 }
 
+function MessageBubble({ message, customerName }: { message: CaseMessageRow; customerName: string }) {
+  const inbound = message.direction === "inbound";
+
+  return (
+    <div
+      className={cn(
+        "rounded-lg border px-3.5 py-2.5",
+        inbound ? "border-line" : "border-accent/30 bg-accent/[0.04]",
+      )}
+    >
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+        <span className="text-label uppercase text-ink-muted">{inbound ? customerName : "Riko"}</span>
+        {message.intent ? <Badge variant="default">{intentLabel(message.intent)}</Badge> : null}
+        {typeof message.confidence === "number" ? (
+          <span className="text-caption tabular-nums text-ink-faint">
+            {Math.round(message.confidence * 100)}% sure
+          </span>
+        ) : null}
+      </div>
+
+      <p className="mt-2 whitespace-pre-wrap text-sm text-ink">{message.body}</p>
+
+      {message.rationale ? (
+        <p className="mt-2 border-t border-line pt-2 text-caption text-ink-faint">
+          Riko read this as: {message.rationale}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export function CaseDetailPage() {
   const { caseId } = useParams<{ caseId: string }>();
   const { data, isLoading, error, refetch, isRefetching } = useCaseDetail(caseId ?? "");
@@ -200,12 +232,13 @@ export function CaseDetailPage() {
     );
   }
 
-  const { case: caseRow, events, actions, customer, payment } = data;
+  const { case: caseRow, events, actions, messages, scheduledDraft, customer, payment } = data;
   const isClosed = Boolean(caseRow.closedAt);
 
   const entries: Entry[] = [
     ...events.map((e) => ({ kind: "event" as const, at: e.createdAt, item: e })),
     ...actions.map((a) => ({ kind: "action" as const, at: a.createdAt, item: a })),
+    ...messages.map((m) => ({ kind: "message" as const, at: m.createdAt, item: m })),
   ].sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
 
   const sentDraft = [...actions]
@@ -213,11 +246,33 @@ export function CaseDetailPage() {
     .find((a) => a.tool === "draft_email" && isEmailDraft(a.output));
   const sentSubject = sentDraft && isEmailDraft(sentDraft.output) ? sentDraft.output.subject : null;
 
-  const steps: { key: string; at: string; label: string; state: CaseUiState; agentWork: Entry[] }[] = [];
+  type Step = {
+    key: string;
+    at: string;
+    label: string;
+    state: CaseUiState;
+    agentWork: Entry[];
+    message: CaseMessageRow | null;
+  };
+
+  const steps: Step[] = [];
   let pending: Entry[] = [];
   for (const entry of entries) {
     if (entry.kind === "action") {
       pending.push(entry);
+      continue;
+    }
+    if (entry.kind === "message") {
+      const inbound = entry.item.direction === "inbound";
+      steps.push({
+        key: entry.item.id,
+        at: entry.at,
+        label: inbound ? `${customer?.name ?? "Customer"} replied` : "Riko replied",
+        state: caseRow.state,
+        agentWork: pending,
+        message: entry.item,
+      });
+      pending = [];
       continue;
     }
     steps.push({
@@ -226,6 +281,7 @@ export function CaseDetailPage() {
       label: entry.item.reason ? reasonLabel(entry.item.reason) : STATE_SENTENCE[entry.item.toState],
       state: entry.item.toState,
       agentWork: pending,
+      message: null,
     });
     pending = [];
   }
@@ -273,6 +329,27 @@ export function CaseDetailPage() {
           </p>
         ) : null}
       </section>
+
+      {scheduledDraft && !isClosed ? (
+        <section className="mt-4 rounded-lg border border-accent/30 bg-accent/[0.04] px-4 py-3.5">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <span className="text-label uppercase text-ink-muted">Written and scheduled</span>
+            {scheduledDraft.scheduledFor ? (
+              <Badge variant="waiting">
+                Sends {day(scheduledDraft.scheduledFor)} at {time(scheduledDraft.scheduledFor)}
+              </Badge>
+            ) : (
+              <Badge variant="waiting">Queued to send</Badge>
+            )}
+          </div>
+          <p className="mt-2.5 text-sm font-medium text-ink">{scheduledDraft.subject}</p>
+          <p className="mt-1.5 whitespace-pre-wrap text-sm text-ink-muted">{scheduledDraft.body}</p>
+          <p className="mt-2 text-caption text-ink-faint">
+            Drafted {day(scheduledDraft.createdAt)} at {time(scheduledDraft.createdAt)}. Riko rewrites it if the
+            facts change before it sends.
+          </p>
+        </section>
+      ) : null}
 
       <div className="mt-10 grid grid-cols-1 gap-10 lg:grid-cols-[1fr_220px]">
         <section className="order-2 lg:order-1">
@@ -325,6 +402,11 @@ export function CaseDetailPage() {
                   <p className="text-sm text-ink">{step.label}</p>
                   <span className="text-caption tabular-nums text-ink-faint">{time(step.at)}</span>
                 </div>
+                {step.message ? (
+                  <div className="mt-2">
+                    <MessageBubble message={step.message} customerName={customer?.name ?? "Customer"} />
+                  </div>
+                ) : null}
                 {step.agentWork.length > 0 ? (
                   <div className="mt-2.5">
                     <AgentWork entries={step.agentWork} sentSubject={sentSubject} />
@@ -363,6 +445,21 @@ export function CaseDetailPage() {
           </dl>
         </aside>
       </div>
+
+      {isClosed ? (
+        <section className="mt-10 rounded-lg border border-line px-4 py-3.5">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <span className="text-label uppercase text-ink-muted">Case closed</span>
+            <Badge variant={STATE_BADGE_VARIANT[caseRow.state]}>{STATE_LABEL[caseRow.state]}</Badge>
+          </div>
+          <p className="mt-2 text-sm text-ink">{reasonLabel(caseRow.closedReason)}</p>
+          {caseRow.closedAt ? (
+            <p className="mt-1 text-caption text-ink-faint">
+              Closed {day(caseRow.closedAt)} at {time(caseRow.closedAt)}
+            </p>
+          ) : null}
+        </section>
+      ) : null}
     </div>
   );
 }
