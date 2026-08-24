@@ -363,7 +363,7 @@ export function SettingsPage() {
                       <div className="mt-1 overflow-hidden rounded-sm border border-line bg-white">
                         <iframe
                           title="Brand template preview"
-                          className="h-[420px] w-full pointer-events-none"
+                          className="h-[420px] w-full border-0"
                           sandbox=""
                           srcDoc={buildPreview(brandTemplateHtml, fromName)}
                         />
