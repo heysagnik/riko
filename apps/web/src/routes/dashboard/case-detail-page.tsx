@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeftIcon, CaretDownIcon, DetectiveIcon, DotsThreeVerticalIcon } from "@phosphor-icons/react";
+import { ArrowLeftIcon, CaretDownIcon, DetectiveIcon, DotsThreeVerticalIcon, EnvelopeSimpleIcon } from "@phosphor-icons/react";
 import {
   STATE_BADGE_VARIANT,
   STATE_LABEL,
@@ -15,7 +15,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/too
 import { useCaseDetail, type AgentActionRow, type CaseEventRow, type CaseMessageRow } from "../../hooks/use-case-detail.js";
 import { formatAmount } from "../../hooks/use-cases.js";
 import { useCloseCase, useHandOffCase, useReplyToCase } from "../../hooks/use-escalations.js";
-import { failureLabel, intentLabel, interventionLabel, INTERVENTION_TONE, reasonLabel } from "../../lib/labels.js";
+import { failureLabel, intentLabel, interventionLabel, INTERVENTION_TONE, reasonDescription, reasonLabel } from "../../lib/labels.js";
 import { cn } from "../../lib/utils.js";
 
 const STATE_SENTENCE: Record<CaseUiState, string> = {
@@ -220,7 +220,7 @@ function AgentWork({
   entries: Entry[];
   status?: "sent" | "scheduled" | "draft" | null | undefined;
 }) {
-  const [open, setOpen] = useState(false);
+  const [openChecks, setOpenChecks] = useState(false);
 
   const drafts = entries.filter((e) => e.kind === "action" && e.item.tool === "draft_email");
   const totalMs = entries.reduce(
@@ -229,87 +229,101 @@ function AgentWork({
   );
 
   const finalDraft = [...drafts].reverse().find((e) => e.kind === "action" && isEmailDraft(e.item.output));
-  const finalOutput = finalDraft && finalDraft.kind === "action" ? finalDraft.item.output : null;
+  const finalOutput = finalDraft && finalDraft.kind === "action" ? (finalDraft.item.output as EmailDraftOutput) : null;
+
+  if (!finalOutput && entries.length === 0) return null;
 
   return (
-    <div className="min-w-0">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex min-h-10 w-full items-center gap-2 rounded-md text-left text-sm text-ink-muted transition-colors duration-150 hover:text-ink"
-      >
-        <CaretDownIcon
-          size={14}
-          weight="bold"
-          className={cn("shrink-0 transition-transform duration-150", open ? "rotate-0" : "-rotate-90")}
-        />
-        <span>
-          Riko wrote {drafts.length} {drafts.length === 1 ? "draft" : "drafts"} and checked{" "}
-          {drafts.length === 1 ? "it" : "them"}
-        </span>
-        <span className="text-caption tabular-nums text-ink-faint">{(totalMs / 1000).toFixed(1)}s</span>
-      </button>
-
-      {!open && isEmailDraft(finalOutput) ? (
-        <div className="mt-3">
-          <DraftCard draft={finalOutput} status={status} />
-        </div>
+    <div className="min-w-0 overflow-hidden rounded-xl border border-line bg-surface shadow-xs">
+      {finalOutput ? (
+        <>
+          <div className="flex items-center justify-between gap-3 border-b border-line bg-surface-sunk px-4 py-2.5">
+            <div className="flex min-w-0 items-center gap-2">
+              <EnvelopeSimpleIcon size={15} className="shrink-0 text-ink-muted" weight="bold" />
+              <p className="min-w-0 truncate text-sm font-medium text-ink">{finalOutput.subject}</p>
+            </div>
+            {status === "sent" ? (
+              <Badge variant="accent">Sent</Badge>
+            ) : status === "scheduled" ? (
+              <Badge variant="waiting">Scheduled</Badge>
+            ) : (
+              <Badge variant="default">Draft</Badge>
+            )}
+          </div>
+          <div className="px-4 py-3 text-sm leading-relaxed text-ink-muted whitespace-pre-wrap break-words">
+            {finalOutput.bodyText}
+          </div>
+        </>
       ) : null}
 
-      {open ? (
-        <ol className="mt-3 space-y-4">
-          {entries.map((entry) => {
-            if (entry.kind !== "action") return null;
-            const { item } = entry;
+      <div className="border-t border-line/70 bg-surface-sunk/50 px-4 py-2">
+        <button
+          type="button"
+          onClick={() => setOpenChecks((v) => !v)}
+          className="flex w-full items-center justify-between gap-2 text-left text-caption text-ink-muted transition-colors hover:text-ink"
+        >
+          <span className="inline-flex items-center gap-1.5 font-medium">
+            <CaretDownIcon
+              size={12}
+              weight="bold"
+              className={cn("shrink-0 transition-transform duration-150", openChecks ? "rotate-0" : "-rotate-90")}
+            />
+            Riko wrote {drafts.length} {drafts.length === 1 ? "draft" : "drafts"} and checked {drafts.length === 1 ? "it" : "them"}
+          </span>
+          <span className="tabular-nums text-ink-faint">{(totalMs / 1000).toFixed(1)}s</span>
+        </button>
 
-            if (item.tool === "draft_email" && isEmailDraft(item.output)) {
-              const isLatest = finalDraft && finalDraft.kind === "action" && finalDraft.item.id === item.id;
+        {openChecks ? (
+          <ol className="mt-2.5 space-y-2 border-t border-line/60 pt-2.5">
+            {entries.map((entry) => {
+              if (entry.kind !== "action") return null;
+              const { item } = entry;
+
+              if (item.tool === "validate_draft" && isValidation(item.output)) {
+                return (
+                  <li key={item.id} className="text-caption">
+                    {item.output.valid ? (
+                      <span className="inline-flex items-center gap-2">
+                        <Badge variant="recovered">Checks passed</Badge>
+                        {typeof item.output.score === "number" ? (
+                          <span className="tabular-nums text-ink-muted">
+                            quality {item.output.score}/100
+                          </span>
+                        ) : null}
+                      </span>
+                    ) : (
+                      <div className="space-y-1">
+                        <Badge variant="lost">Rejected</Badge>
+                        <ul className="space-y-0.5 pl-1">
+                          {item.output.failures.map((f) => (
+                            <li key={f.rule} className="text-caption text-lost">
+                              {f.detail}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </li>
+                );
+              }
+
+              if (item.tool === "draft_email" && isEmailDraft(item.output)) {
+                return (
+                  <li key={item.id} className="text-caption text-ink-faint">
+                    Drafted by {item.model ?? "model"} · {item.latencyMs ?? "—"}ms
+                  </li>
+                );
+              }
+
               return (
-                <li key={item.id}>
-                  <p className="mb-1.5 text-caption text-ink-faint">
-                    Draft · {item.model ?? "model"} · {item.latencyMs ?? "—"}ms
-                  </p>
-                  <DraftCard draft={item.output} status={isLatest ? status : "draft"} />
+                <li key={item.id} className="text-caption text-ink-faint">
+                  {item.tool}
                 </li>
               );
-            }
-
-            if (item.tool === "validate_draft" && isValidation(item.output)) {
-              return (
-                <li key={item.id} className="text-sm">
-                  {item.output.valid ? (
-                    <span className="flex items-center gap-2">
-                      <Badge variant="recovered">Checks passed</Badge>
-                      {typeof item.output.score === "number" ? (
-                        <span className="text-caption tabular-nums text-ink-faint">
-                          quality {item.output.score}/100
-                        </span>
-                      ) : null}
-                    </span>
-                  ) : (
-                    <div>
-                      <Badge variant="lost">Rejected</Badge>
-                      <ul className="mt-1.5 space-y-0.5">
-                        {item.output.failures.map((f) => (
-                          <li key={f.rule} className="text-caption text-ink-muted">
-                            {f.detail}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </li>
-              );
-            }
-
-            return (
-              <li key={item.id} className="text-caption text-ink-faint">
-                {item.tool}
-              </li>
-            );
-          })}
-        </ol>
-      ) : null}
+            })}
+          </ol>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -417,6 +431,7 @@ export function CaseDetailPage() {
     key: string;
     at: string;
     label: string;
+    description?: string | null;
     state: CaseUiState;
     agentWork: Entry[];
     message: CaseMessageRow | null;
@@ -432,6 +447,7 @@ export function CaseDetailPage() {
     }
     if (entry.kind === "message") {
       const inbound = entry.item.direction === "inbound";
+      const isAgentReply = !inbound && !merchantMessageIds.has(entry.item.id);
       const label = inbound
         ? `${customer?.name ?? "Customer"} replied`
         : merchantMessageIds.has(entry.item.id)
@@ -441,34 +457,47 @@ export function CaseDetailPage() {
         key: entry.item.id,
         at: entry.at,
         label,
+        description: null,
         state: caseRow.state,
-        agentWork: pending,
+        agentWork: isAgentReply ? pending : [],
         message: entry.item,
         workStatus: "draft",
       });
       pending = [];
       continue;
     }
+
+    const isAgentOutreachEvent =
+      entry.item.reason === "draft_scheduled" ||
+      entry.item.reason === "draft_valid" ||
+      entry.item.reason === "scheduled_draft_used" ||
+      entry.item.reason === "outreach_sent" ||
+      entry.item.reason === "agent_answered" ||
+      entry.item.fromState === "DRAFTING" ||
+      entry.item.fromState === "SENDING";
+
     steps.push({
       key: entry.item.id,
       at: entry.at,
       label: entry.item.reason ? reasonLabel(entry.item.reason) : STATE_SENTENCE[entry.item.toState],
+      description: entry.item.reason ? reasonDescription(entry.item.reason) : null,
       state: entry.item.toState,
-      agentWork: pending,
+      agentWork: isAgentOutreachEvent ? pending : [],
       message: null,
       workStatus:
-        entry.item.reason === "draft_scheduled"
-          ? "scheduled"
-          : entry.item.fromState === "SENDING" || entry.item.reason === "outreach_sent"
-            ? "sent"
-            : entry.item.toState === "DRAFTING"
-              ? "draft"
-              : "scheduled",
+        entry.item.reason === "outreach_sent" || entry.item.fromState === "SENDING"
+          ? "sent"
+          : entry.item.reason === "draft_scheduled" && !isClosed && caseRow.state !== "LOST" && caseRow.state !== "SKIPPED" && caseRow.state !== "ESCALATED"
+            ? "scheduled"
+            : "draft",
     });
     pending = [];
   }
   if (pending.length > 0 && steps.length > 0) {
-    steps[steps.length - 1]!.agentWork.push(...pending);
+    const lastStep = steps[steps.length - 1]!;
+    if (lastStep.agentWork.length > 0) {
+      lastStep.agentWork.push(...pending);
+    }
   }
 
   const attemptCap = 3;
@@ -587,13 +616,16 @@ export function CaseDetailPage() {
                   <p className="text-sm font-medium text-ink">{step.label}</p>
                   <span className="text-caption tabular-nums text-ink-faint">{time(step.at)}</span>
                 </div>
+                {step.description ? (
+                  <p className="mt-0.5 text-caption leading-relaxed text-ink-muted">{step.description}</p>
+                ) : null}
                 {step.message ? (
                   <div className="mt-2.5">
                     <MessageBubble message={step.message} customerName={customer?.name ?? "Customer"} />
                   </div>
                 ) : null}
                 {step.agentWork.length > 0 ? (
-                  <div className="mt-2.5 rounded-lg border border-dashed border-line bg-surface-sunk/60 px-3 py-2.5">
+                  <div className="mt-2.5">
                     <AgentWork entries={step.agentWork} status={step.workStatus} />
                   </div>
                 ) : null}
@@ -619,15 +651,25 @@ export function CaseDetailPage() {
                       ? reasonLabel(caseRow.closedReason)
                       : "Handed to a person"}
                 </p>
-                {latestInbound?.rationale ? (
-                  <p className="mt-1.5 text-caption text-ink-muted">
-                    Riko read this as: {latestInbound.rationale}
-                  </p>
-                ) : (
-                  <p className="mt-1.5 text-caption text-ink-muted">
-                    Automated outreach is paused while you handle this conversation.
-                  </p>
-                )}
+                <p className="mt-1.5 text-caption text-ink-muted">
+                  {latestInbound?.rationale
+                    ? `Riko read this as: ${latestInbound.rationale}`
+                    : caseRow.closedReason === "merchant_configuration_fault" || caseRow.interventionReason === "merchant_configuration_fault"
+                      ? payment?.failureCode
+                        ? `The gateway reported "${payment.failureCode}". Automated emails are paused to avoid blaming the customer for a gateway or business configuration issue.`
+                        : "The payment provider reported an account configuration issue. Automated emails are paused to avoid incorrectly asking the customer to fix their card."
+                      : caseRow.closedReason === "above_human_review_threshold" || caseRow.interventionReason === "above_human_review_threshold"
+                        ? "The amount at stake exceeds your automated outreach threshold and requires human review."
+                        : caseRow.closedReason === "unmapped_failure_code" || caseRow.interventionReason === "unmapped_failure_code"
+                          ? payment?.failureCode
+                            ? `Payment failed with unrecognised code "${payment.failureCode}". Paused for manual review.`
+                            : "Payment failed with an unrecognised code. Paused for manual review."
+                          : caseRow.closedReason === "validation_failed_3x"
+                            ? "Generated drafts did not meet safety and quality rules. Handed over for you to reply."
+                            : caseRow.closedReason === "agent_reply_limit_reached"
+                              ? "The automated reply limit was reached for this thread. Handed over to continue directly."
+                              : "Automated outreach is paused while you handle this conversation."}
+                </p>
               </section>
             ) : isPromised ? (
               <section className="min-w-0 rounded-lg border border-waiting/30 bg-waiting/[0.04] px-4 py-3.5 shadow-sm">
@@ -665,8 +707,10 @@ export function CaseDetailPage() {
                       : "Customer paid"
                     : reasonLabel(caseRow.closedReason)}
                 </p>
-                {isRecovered && caseRow.closedReason ? (
-                  <p className="mt-1 text-caption text-ink-muted">{reasonLabel(caseRow.closedReason)}</p>
+                {caseRow.closedReason && reasonDescription(caseRow.closedReason) ? (
+                  <p className="mt-1 text-caption text-ink-muted leading-relaxed">
+                    {reasonDescription(caseRow.closedReason)}
+                  </p>
                 ) : null}
                 {caseRow.closedAt ? (
                   <p className="mt-1.5 text-caption text-ink-faint">
@@ -683,6 +727,11 @@ export function CaseDetailPage() {
                   </Badge>
                 </div>
                 <p className="mt-2 text-sm text-ink">{reasonLabel(caseRow.interventionReason)}</p>
+                {caseRow.interventionReason && reasonDescription(caseRow.interventionReason) ? (
+                  <p className="mt-1 text-caption text-ink-muted leading-relaxed">
+                    {reasonDescription(caseRow.interventionReason)}
+                  </p>
+                ) : null}
                 {caseRow.nextActionAt ? (
                   <p className="mt-1.5 text-caption text-ink-faint">
                     Next look {day(caseRow.nextActionAt)} at {time(caseRow.nextActionAt)}
@@ -712,18 +761,6 @@ export function CaseDetailPage() {
               </section>
             ) : null}
 
-            {(isEscalated || isPromised || isTerminalClosed) && caseRow.intervention ? (
-              <SidebarSection label="Initial decision">
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                  <DetectiveIcon size={16} weight="regular" className="text-ink-muted" />
-                  <Badge variant={INTERVENTION_TONE[caseRow.intervention ?? ""] ?? "default"}>
-                    {interventionLabel(caseRow.intervention)}
-                  </Badge>
-                </div>
-                <p className="mt-2 text-sm text-ink">{reasonLabel(caseRow.interventionReason)}</p>
-              </SidebarSection>
-            ) : null}
-
             <SidebarSection label="Payment">
               <dl className="space-y-2.5 text-sm">
                 <div className="flex justify-between gap-3">
@@ -731,12 +768,18 @@ export function CaseDetailPage() {
                   <dd className="text-right text-ink">{payment ? day(payment.occurredAt) : "—"}</dd>
                 </div>
                 <div className="flex justify-between gap-3">
-                  <dt className="text-ink-muted">Cause</dt>
-                  <dd className="text-right text-ink">{payment?.failureSource ?? "—"}</dd>
+                  <dt className="text-ink-muted">Error</dt>
+                  <dd className="text-right text-ink">{failureLabel(payment?.failureCategory)}</dd>
                 </div>
                 <div className="flex justify-between gap-3">
-                  <dt className="text-ink-muted">Provider code</dt>
-                  <dd className="text-right font-mono text-caption text-ink">{payment?.failureCode ?? "—"}</dd>
+                  <dt className="text-ink-muted">Error code</dt>
+                  <dd className="text-right font-mono text-caption text-ink">
+                    {payment?.failureCode || (payment?.failureCategory ? failureLabel(payment.failureCategory) : "—")}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-ink-muted">Cause</dt>
+                  <dd className="text-right text-ink capitalize">{payment?.failureSource ?? "—"}</dd>
                 </div>
                 {payment?.providerRetryAt ? (
                   <div className="flex justify-between gap-3">

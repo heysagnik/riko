@@ -21,11 +21,11 @@ import { failureLabel, reasonLabel } from "../../lib/labels.js";
 import { cn } from "../../lib/utils.js";
 
 const STATUS_OPTIONS = [
-  { value: "OPEN", label: "Open" },
+  { value: "ALL", label: "All" },
   { value: "NEEDS_YOU", label: "Needs you" },
+  { value: "OPEN", label: "Open" },
   { value: "RECOVERED", label: "Recovered" },
   { value: "CLOSED", label: "Closed" },
-  { value: "ALL", label: "All" },
 ];
 
 const DATE_OPTIONS = [
@@ -214,7 +214,7 @@ function NeedsYouView() {
 
 export function CaseListPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const filter = searchParams.get("state") ?? "OPEN";
+  const filter = searchParams.get("state") ?? "ALL";
   const range = searchParams.get("range") ?? "all";
   const offset = Number(searchParams.get("offset") ?? "0") || 0;
   const bounds = dateBounds(range);

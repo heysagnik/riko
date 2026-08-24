@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { CaseDetail } from "./use-case-detail.js";
 
 export interface Escalation {
   id: string;
@@ -44,7 +45,46 @@ export function useResolveEscalation() {
       }
       return response.json() as Promise<{ ok: true; state: string }>;
     },
-    onSuccess: () => {
+    onMutate: async ({ caseId, action }) => {
+      await queryClient.cancelQueries({ queryKey: ["cases", caseId] });
+      const previousCaseDetail = queryClient.getQueryData<CaseDetail>(["cases", caseId]);
+
+      if (previousCaseDetail) {
+        const now = new Date().toISOString();
+        const nextState = action === "approve_send" ? "SENDING" : action === "close_unrecoverable" ? "LOST" : "NEW";
+        const reason = action === "approve_send" ? "approved_by_merchant" : action === "close_unrecoverable" ? "closed_by_merchant" : "returned_by_merchant";
+
+        queryClient.setQueryData<CaseDetail>(["cases", caseId], {
+          ...previousCaseDetail,
+          case: {
+            ...previousCaseDetail.case,
+            state: nextState,
+            closedAt: nextState === "LOST" ? now : null,
+            closedReason: nextState === "LOST" ? reason : null,
+          },
+          events: [
+            ...previousCaseDetail.events,
+            {
+              id: `temp-${Date.now()}`,
+              fromState: previousCaseDetail.case.state,
+              toState: nextState,
+              reason,
+              actor: "merchant",
+              createdAt: now,
+            },
+          ],
+        });
+      }
+
+      return { previousCaseDetail };
+    },
+    onError: (_err, { caseId }, context) => {
+      if (context?.previousCaseDetail) {
+        queryClient.setQueryData(["cases", caseId], context.previousCaseDetail);
+      }
+    },
+    onSettled: (_data, _error, { caseId }) => {
+      queryClient.invalidateQueries({ queryKey: ["cases", caseId] });
       queryClient.invalidateQueries({ queryKey: ["escalations"] });
       queryClient.invalidateQueries({ queryKey: ["cases"] });
       queryClient.invalidateQueries({ queryKey: ["metrics"] });
@@ -63,9 +103,45 @@ export function useHandOffCase() {
       }
       return response.json() as Promise<{ ok: true; state: string }>;
     },
-    onSuccess: (_data, caseId) => {
+    onMutate: async (caseId: string) => {
+      await queryClient.cancelQueries({ queryKey: ["cases", caseId] });
+      const previousCaseDetail = queryClient.getQueryData<CaseDetail>(["cases", caseId]);
+
+      if (previousCaseDetail) {
+        const now = new Date().toISOString();
+        queryClient.setQueryData<CaseDetail>(["cases", caseId], {
+          ...previousCaseDetail,
+          case: {
+            ...previousCaseDetail.case,
+            state: "ESCALATED",
+            closedAt: null,
+            closedReason: null,
+          },
+          events: [
+            ...previousCaseDetail.events,
+            {
+              id: `temp-${Date.now()}`,
+              fromState: previousCaseDetail.case.state,
+              toState: "ESCALATED",
+              reason: "handed_off_by_merchant",
+              actor: "merchant",
+              createdAt: now,
+            },
+          ],
+        });
+      }
+
+      return { previousCaseDetail };
+    },
+    onError: (_err, caseId, context) => {
+      if (context?.previousCaseDetail) {
+        queryClient.setQueryData(["cases", caseId], context.previousCaseDetail);
+      }
+    },
+    onSettled: (_data, _error, caseId) => {
       queryClient.invalidateQueries({ queryKey: ["cases", caseId] });
       queryClient.invalidateQueries({ queryKey: ["escalations"] });
+      queryClient.invalidateQueries({ queryKey: ["cases"] });
     },
   });
 }
@@ -81,10 +157,46 @@ export function useCloseCase() {
       }
       return response.json() as Promise<{ ok: true; state: string }>;
     },
-    onSuccess: (_data, caseId) => {
+    onMutate: async (caseId: string) => {
+      await queryClient.cancelQueries({ queryKey: ["cases", caseId] });
+      const previousCaseDetail = queryClient.getQueryData<CaseDetail>(["cases", caseId]);
+
+      if (previousCaseDetail) {
+        const now = new Date().toISOString();
+        queryClient.setQueryData<CaseDetail>(["cases", caseId], {
+          ...previousCaseDetail,
+          case: {
+            ...previousCaseDetail.case,
+            state: "LOST",
+            closedAt: now,
+            closedReason: "closed_by_merchant",
+          },
+          events: [
+            ...previousCaseDetail.events,
+            {
+              id: `temp-${Date.now()}`,
+              fromState: previousCaseDetail.case.state,
+              toState: "LOST",
+              reason: "closed_by_merchant",
+              actor: "merchant",
+              createdAt: now,
+            },
+          ],
+        });
+      }
+
+      return { previousCaseDetail };
+    },
+    onError: (_err, caseId, context) => {
+      if (context?.previousCaseDetail) {
+        queryClient.setQueryData(["cases", caseId], context.previousCaseDetail);
+      }
+    },
+    onSettled: (_data, _error, caseId) => {
       queryClient.invalidateQueries({ queryKey: ["cases", caseId] });
       queryClient.invalidateQueries({ queryKey: ["escalations"] });
       queryClient.invalidateQueries({ queryKey: ["cases"] });
+      queryClient.invalidateQueries({ queryKey: ["metrics"] });
     },
   });
 }
