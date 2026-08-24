@@ -67,12 +67,29 @@ function day(iso: string): string {
   return new Date(iso).toLocaleDateString([], { day: "numeric", month: "short" });
 }
 
-function DraftCard({ draft, sent }: { draft: EmailDraftOutput; sent: boolean }) {
+function DraftCard({
+  draft,
+  status = "scheduled",
+}: {
+  draft: EmailDraftOutput;
+  status?: "sent" | "scheduled" | "draft" | null | undefined;
+}) {
   return (
-    <div className={cn("min-w-0 overflow-hidden rounded-lg border bg-surface-sunk", sent ? "border-accent/40" : "border-line")}>
+    <div
+      className={cn(
+        "min-w-0 overflow-hidden rounded-lg border bg-surface-sunk",
+        status === "sent" ? "border-accent/40" : status === "scheduled" ? "border-waiting/40" : "border-line",
+      )}
+    >
       <div className="flex items-center justify-between gap-3 border-b border-line px-3 py-2">
         <p className="min-w-0 truncate text-sm font-medium text-ink">{draft.subject}</p>
-        {sent ? <Badge variant="accent">Sent</Badge> : null}
+        {status === "sent" ? (
+          <Badge variant="accent">Sent</Badge>
+        ) : status === "scheduled" ? (
+          <Badge variant="waiting">Scheduled</Badge>
+        ) : status === "draft" ? (
+          <Badge variant="default">Draft</Badge>
+        ) : null}
       </div>
       <p className="whitespace-pre-wrap break-words px-3 py-2.5 text-sm leading-relaxed text-ink-muted">{draft.bodyText}</p>
     </div>
@@ -196,7 +213,13 @@ type Entry =
   | { kind: "action"; at: string; item: AgentActionRow }
   | { kind: "message"; at: string; item: CaseMessageRow };
 
-function AgentWork({ entries, sentSubject }: { entries: Entry[]; sentSubject: string | null }) {
+function AgentWork({
+  entries,
+  status = "scheduled",
+}: {
+  entries: Entry[];
+  status?: "sent" | "scheduled" | "draft" | null | undefined;
+}) {
   const [open, setOpen] = useState(false);
 
   const drafts = entries.filter((e) => e.kind === "action" && e.item.tool === "draft_email");
@@ -229,7 +252,7 @@ function AgentWork({ entries, sentSubject }: { entries: Entry[]; sentSubject: st
 
       {!open && isEmailDraft(finalOutput) ? (
         <div className="mt-3">
-          <DraftCard draft={finalOutput} sent={finalOutput.subject === sentSubject} />
+          <DraftCard draft={finalOutput} status={status} />
         </div>
       ) : null}
 
@@ -240,12 +263,13 @@ function AgentWork({ entries, sentSubject }: { entries: Entry[]; sentSubject: st
             const { item } = entry;
 
             if (item.tool === "draft_email" && isEmailDraft(item.output)) {
+              const isLatest = finalDraft && finalDraft.kind === "action" && finalDraft.item.id === item.id;
               return (
                 <li key={item.id}>
                   <p className="mb-1.5 text-caption text-ink-faint">
                     Draft · {item.model ?? "model"} · {item.latencyMs ?? "—"}ms
                   </p>
-                  <DraftCard draft={item.output} sent={item.output.subject === sentSubject} />
+                  <DraftCard draft={item.output} status={isLatest ? status : "draft"} />
                 </li>
               );
             }
@@ -356,6 +380,12 @@ export function CaseDetailPage() {
   const { case: caseRow, events, actions, messages, scheduledDraft, customer, payment } = data;
   const isClosed = Boolean(caseRow.closedAt);
   const isEscalated = caseRow.state === "ESCALATED";
+  const isPromised = caseRow.state === "PROMISED";
+  const isRecovered = caseRow.state === "RECOVERED";
+  const isTerminalClosed = caseRow.state === "RECOVERED" || caseRow.state === "SKIPPED" || caseRow.state === "LOST";
+
+  const inboundMessages = messages.filter((m) => m.direction === "inbound");
+  const latestInbound = inboundMessages[inboundMessages.length - 1];
 
   // A merchant reply logs both a "merchant_replied" case event and a
   // caseMessages row for the same action. Fold them into one timeline step
@@ -383,11 +413,6 @@ export function CaseDetailPage() {
     ...messages.map((m) => ({ kind: "message" as const, at: m.createdAt, item: m })),
   ].sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
 
-  const sentDraft = [...actions]
-    .reverse()
-    .find((a) => a.tool === "draft_email" && isEmailDraft(a.output));
-  const sentSubject = sentDraft && isEmailDraft(sentDraft.output) ? sentDraft.output.subject : null;
-
   type Step = {
     key: string;
     at: string;
@@ -395,6 +420,7 @@ export function CaseDetailPage() {
     state: CaseUiState;
     agentWork: Entry[];
     message: CaseMessageRow | null;
+    workStatus?: "sent" | "scheduled" | "draft" | null;
   };
 
   const steps: Step[] = [];
@@ -418,6 +444,7 @@ export function CaseDetailPage() {
         state: caseRow.state,
         agentWork: pending,
         message: entry.item,
+        workStatus: "draft",
       });
       pending = [];
       continue;
@@ -429,6 +456,14 @@ export function CaseDetailPage() {
       state: entry.item.toState,
       agentWork: pending,
       message: null,
+      workStatus:
+        entry.item.reason === "draft_scheduled"
+          ? "scheduled"
+          : entry.item.fromState === "SENDING" || entry.item.reason === "outreach_sent"
+            ? "sent"
+            : entry.item.toState === "DRAFTING"
+              ? "draft"
+              : "scheduled",
     });
     pending = [];
   }
@@ -559,7 +594,7 @@ export function CaseDetailPage() {
                 ) : null}
                 {step.agentWork.length > 0 ? (
                   <div className="mt-2.5 rounded-lg border border-dashed border-line bg-surface-sunk/60 px-3 py-2.5">
-                    <AgentWork entries={step.agentWork} sentSubject={sentSubject} />
+                    <AgentWork entries={step.agentWork} status={step.workStatus} />
                   </div>
                 ) : null}
               </li>
@@ -571,34 +606,92 @@ export function CaseDetailPage() {
 
         <aside className="min-w-0 order-1 lg:order-2">
           <div className="space-y-4 lg:sticky lg:top-6">
-            <SidebarSection label="Riko decided">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                <DetectiveIcon size={16} weight="regular" className="text-ink-muted" />
-                <Badge variant={INTERVENTION_TONE[caseRow.intervention ?? ""] ?? "default"}>
-                  {interventionLabel(caseRow.intervention)}
-                </Badge>
-              </div>
-              <p className="mt-2 text-sm text-ink">{reasonLabel(caseRow.interventionReason)}</p>
-              {caseRow.nextActionAt && !isClosed ? (
-                <p className="mt-1.5 text-caption text-ink-faint">
-                  Next look {day(caseRow.nextActionAt)} at {time(caseRow.nextActionAt)}
+            {isEscalated ? (
+              <section className="min-w-0 rounded-lg border border-lost/30 bg-lost/[0.04] px-4 py-3.5 shadow-sm">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                  <p className="text-label uppercase text-ink-faint">Conversation status</p>
+                  <Badge variant="lost">Needs you</Badge>
+                </div>
+                <p className="mt-2 text-sm font-medium text-ink">
+                  {latestInbound?.intent
+                    ? intentLabel(latestInbound.intent)
+                    : caseRow.closedReason
+                      ? reasonLabel(caseRow.closedReason)
+                      : "Handed to a person"}
                 </p>
-              ) : null}
-            </SidebarSection>
-
-            {isClosed ? (
-              <SidebarSection label="Outcome">
-                <Badge variant={STATE_BADGE_VARIANT[caseRow.state]}>{STATE_LABEL[caseRow.state]}</Badge>
-                <p className="mt-2 text-sm text-ink">{reasonLabel(caseRow.closedReason)}</p>
+                {latestInbound?.rationale ? (
+                  <p className="mt-1.5 text-caption text-ink-muted">
+                    Riko read this as: {latestInbound.rationale}
+                  </p>
+                ) : (
+                  <p className="mt-1.5 text-caption text-ink-muted">
+                    Automated outreach is paused while you handle this conversation.
+                  </p>
+                )}
+              </section>
+            ) : isPromised ? (
+              <section className="min-w-0 rounded-lg border border-waiting/30 bg-waiting/[0.04] px-4 py-3.5 shadow-sm">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                  <p className="text-label uppercase text-ink-faint">Conversation outcome</p>
+                  <Badge variant="waiting">Promised to pay</Badge>
+                </div>
+                <p className="mt-2 text-sm font-medium text-ink">Customer committed to pay</p>
+                {caseRow.nextActionAt ? (
+                  <p className="mt-1 text-caption text-ink-muted">
+                    Holding outreach until {day(caseRow.nextActionAt)} at {time(caseRow.nextActionAt)}.
+                  </p>
+                ) : null}
+                {latestInbound?.rationale ? (
+                  <p className="mt-1.5 text-caption text-ink-faint">
+                    Riko read this as: {latestInbound.rationale}
+                  </p>
+                ) : null}
+              </section>
+            ) : isTerminalClosed ? (
+              <section
+                className={cn(
+                  "min-w-0 rounded-lg border px-4 py-3.5 shadow-sm",
+                  isRecovered ? "border-recovered/30 bg-recovered/[0.04]" : "border-line bg-surface",
+                )}
+              >
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                  <p className="text-label uppercase text-ink-faint">Outcome</p>
+                  <Badge variant={STATE_BADGE_VARIANT[caseRow.state]}>{STATE_LABEL[caseRow.state]}</Badge>
+                </div>
+                <p className="mt-2 text-sm font-medium text-ink">
+                  {isRecovered
+                    ? payment
+                      ? `${formatAmount(payment.amountMinor, payment.currency)} recovered`
+                      : "Customer paid"
+                    : reasonLabel(caseRow.closedReason)}
+                </p>
+                {isRecovered && caseRow.closedReason ? (
+                  <p className="mt-1 text-caption text-ink-muted">{reasonLabel(caseRow.closedReason)}</p>
+                ) : null}
                 {caseRow.closedAt ? (
                   <p className="mt-1.5 text-caption text-ink-faint">
                     Closed {day(caseRow.closedAt)} at {time(caseRow.closedAt)}
                   </p>
                 ) : null}
+              </section>
+            ) : (
+              <SidebarSection label="Riko decided">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                  <DetectiveIcon size={16} weight="regular" className="text-ink-muted" />
+                  <Badge variant={INTERVENTION_TONE[caseRow.intervention ?? ""] ?? "default"}>
+                    {interventionLabel(caseRow.intervention)}
+                  </Badge>
+                </div>
+                <p className="mt-2 text-sm text-ink">{reasonLabel(caseRow.interventionReason)}</p>
+                {caseRow.nextActionAt ? (
+                  <p className="mt-1.5 text-caption text-ink-faint">
+                    Next look {day(caseRow.nextActionAt)} at {time(caseRow.nextActionAt)}
+                  </p>
+                ) : null}
               </SidebarSection>
-            ) : null}
+            )}
 
-            {scheduledDraft && !isClosed ? (
+            {scheduledDraft && !isClosed && !isEscalated && !isPromised ? (
               <section className="min-w-0 rounded-lg border border-accent/30 bg-accent/[0.04] px-4 py-3.5 shadow-sm">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                   <p className="text-label uppercase text-ink-faint">Written and scheduled</p>
@@ -617,6 +710,18 @@ export function CaseDetailPage() {
                   the facts change before it sends.
                 </p>
               </section>
+            ) : null}
+
+            {(isEscalated || isPromised || isTerminalClosed) && caseRow.intervention ? (
+              <SidebarSection label="Initial decision">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                  <DetectiveIcon size={16} weight="regular" className="text-ink-muted" />
+                  <Badge variant={INTERVENTION_TONE[caseRow.intervention ?? ""] ?? "default"}>
+                    {interventionLabel(caseRow.intervention)}
+                  </Badge>
+                </div>
+                <p className="mt-2 text-sm text-ink">{reasonLabel(caseRow.interventionReason)}</p>
+              </SidebarSection>
             ) : null}
 
             <SidebarSection label="Payment">

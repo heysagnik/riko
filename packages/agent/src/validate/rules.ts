@@ -65,12 +65,12 @@ export function validateDraft(draft: EmailDraft, facts: CaseFacts): ValidationRe
   const haystack = `${draft.subject} ${draft.bodyText}`.toLowerCase();
 
   const formattedAmount = formatDraftAmount(facts.amountMinor);
-  if (!draft.bodyText.includes(formattedAmount) && !draft.bodyHtml.includes(formattedAmount)) {
-    failures.push({ rule: "amount_present", detail: `Expected amount ${formattedAmount} in draft body` });
+  if (!draft.bodyText.includes(formattedAmount) || !draft.bodyHtml.includes(formattedAmount)) {
+    failures.push({ rule: "amount_present", detail: `Expected amount ${formattedAmount} in both draft body variants` });
   }
 
-  if (!draft.bodyText.includes(facts.customerName) && !draft.bodyHtml.includes(facts.customerName)) {
-    failures.push({ rule: "customer_name_present", detail: "Customer name missing from draft body" });
+  if (!draft.bodyText.includes(facts.customerName) || !draft.bodyHtml.includes(facts.customerName)) {
+    failures.push({ rule: "customer_name_present", detail: "Customer name missing from one or both draft body variants" });
   }
 
   for (const term of BLOCKLIST) {

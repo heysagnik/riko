@@ -225,6 +225,9 @@ importers:
       '@ai-sdk/openai-compatible':
         specifier: ^3
         version: 3.0.34(zod@4.4.3)
+      '@riko/core':
+        specifier: workspace:*
+        version: link:../core
       '@riko/shared':
         specifier: workspace:*
         version: link:../shared
@@ -235,6 +238,9 @@ importers:
         specifier: ^4
         version: 4.4.3
     devDependencies:
+      '@ai-sdk/provider':
+        specifier: ^4
+        version: 4.0.7
       tsx:
         specifier: ^4.19.0
         version: 4.23.12

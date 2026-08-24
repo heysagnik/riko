@@ -52,7 +52,21 @@ function extractUrls(text: string): string[] {
   return (text.match(/https?:\/\/[^\s"'<>]+/g) ?? []).map((url) => url.replace(/[.,;:!?)\]]+$/, ""));
 }
 
-export function validateReply(replyText: string, allowedUrls: string[]): ReplyValidationResult {
+// Scoped to currency-marked figures (INR/Rs/₹ next to a number) rather than
+// every digit in the reply, so a promised payment date ("by 15 August") never
+// trips this - only a figure presented as money can be a hallucinated amount.
+const CURRENCY_AMOUNT = /(?:inr|rs\.?|₹)\s*([\d,]+(?:\.\d+)?)|([\d,]+(?:\.\d+)?)\s*(?:inr|rupees)/gi;
+
+function extractCurrencyAmounts(text: string): string[] {
+  const amounts: string[] = [];
+  for (const match of text.matchAll(CURRENCY_AMOUNT)) {
+    const raw = match[1] ?? match[2];
+    if (raw) amounts.push(raw.replace(/,/g, ""));
+  }
+  return amounts;
+}
+
+export function validateReply(replyText: string, allowedUrls: string[], allowedAmounts: string[] = []): ReplyValidationResult {
   const failures: ReplyValidationFailure[] = [];
 
   for (const group of FORBIDDEN_PHRASES) {
@@ -73,6 +87,15 @@ export function validateReply(replyText: string, allowedUrls: string[]): ReplyVa
   for (const url of extractUrls(replyText)) {
     if (!allowed.has(url)) {
       failures.push({ rule: "url_allowlist", detail: `Unexpected URL in reply: ${url}` });
+    }
+  }
+
+  if (allowedAmounts.length > 0) {
+    const allowedSet = new Set(allowedAmounts);
+    for (const amount of extractCurrencyAmounts(replyText)) {
+      if (!allowedSet.has(amount)) {
+        failures.push({ rule: "amount_consistency", detail: `Reply states an amount not given to it: ${amount}` });
+      }
     }
   }
 

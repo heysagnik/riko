@@ -1,7 +1,8 @@
-import { generateObject, generateText, type LanguageModel } from "ai";
+import { APICallError, UnsupportedFunctionalityError, generateObject, generateText, type LanguageModel } from "ai";
 import { z } from "zod";
 import type { CaseFacts, EmailDraft } from "@riko/shared";
 import { buildSystemPrompt } from "./prompts/system.js";
+import { escapeForTag } from "./prompt-safety.js";
 import { BODY_WORD_MAX, BODY_WORD_MIN, SUBJECT_MAX_LENGTH, formatDraftAmount } from "./validate/rules.js";
 
 const structuredOutputSupport = new Map<string, boolean>();
@@ -126,6 +127,16 @@ function extractJsonObject(text: string): string {
   return text.slice(start);
 }
 
+// Only a genuine "this model/provider cannot do schema-constrained output"
+// error should permanently disable it. A rate limit, timeout, or transient
+// server error says nothing about capability and must not poison every draft
+// for the rest of the worker's life.
+function isSchemaUnsupportedError(error: unknown): boolean {
+  if (UnsupportedFunctionalityError.isInstance(error)) return true;
+  if (APICallError.isInstance(error) && error.statusCode === 400 && !error.isRetryable) return true;
+  return false;
+}
+
 function parseDraft(text: string): EmailDraft {
   const parsed: unknown = JSON.parse(extractJsonObject(stripCodeFence(text)));
   if (
@@ -156,7 +167,7 @@ export async function draftEmail(
   const started = Date.now();
 
   const userContent = [
-    `Fact set: ${JSON.stringify(facts)}`,
+    `<fact_set>\n${escapeForTag(JSON.stringify(facts))}\n</fact_set>`,
     exemplarFor(facts),
     buildRequirements(facts),
     DRAFT_SCHEMA_HINT,
@@ -185,8 +196,13 @@ export async function draftEmail(
       const { object } = await generateObject({ ...shared, schema: draftSchema });
       structuredOutputSupport.set(modelId, true);
       return { draft: object, model: modelId, latencyMs: Date.now() - started };
-    } catch {
-      structuredOutputSupport.set(modelId, false);
+    } catch (error) {
+      if (isSchemaUnsupportedError(error)) {
+        structuredOutputSupport.set(modelId, false);
+      }
+      // Otherwise fall through to the plain-text path for this call only,
+      // leaving the cache untouched so the next draft still tries structured
+      // output.
     }
   }
 

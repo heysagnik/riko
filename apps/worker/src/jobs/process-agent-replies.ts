@@ -2,7 +2,7 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { db, cases, caseMessages, promises, appendCaseEvent } from "@riko/db";
 import { applyTransition, isWithinContactWindow, extractPromise, MIN_PROMISE_CONFIDENCE } from "@riko/core";
-import { reasonReply, validateReply, type ConversationTurn } from "@riko/agent";
+import { reasonReply, validateReply, detectEscalationSignals, type ConversationTurn } from "@riko/agent";
 import { getTransporterForSmtpConfig } from "../lib/mailer.js";
 import { llmRateLimiter, processWithConcurrency, roundRobinByTenant } from "../lib/rate-limiter.js";
 import type { SendableOutreach } from "./process-sending-cases.js";
@@ -122,16 +122,28 @@ export async function processAgentReplies({ loadReplyContext }: AgentReplyDeps):
         .set({ intent: reasoning.intent, confidence: reasoning.confidence, rationale: reasoning.rationale })
         .where(eq(caseMessages.id, latest.id));
 
+      // The model's self-reported confidence is not trustworthy on its own -
+      // small models are prone to overconfidence on messages containing
+      // legal, dispute, or distress language. Scan the customer's raw
+      // message independently so a mis-classified case still reaches a
+      // person even when the model was confident.
+      const escalationSignals = detectEscalationSignals(latest.body);
+      const needsHuman = reasoning.needsHuman || escalationSignals.length > 0;
+
       if (!reasoning.replyText) {
-        if (reasoning.needsHuman) {
-          await escalate(caseRow, `agent_deferred:${reasoning.intent}`);
+        if (needsHuman) {
+          const reason = reasoning.needsHuman
+            ? `agent_deferred:${reasoning.intent}`
+            : `agent_deferred:${reasoning.intent}:heuristic:${escalationSignals[0]!.rule}`;
+          await escalate(caseRow, reason);
         } else {
           await db.update(cases).set({ awaitingAgentReply: false }).where(eq(cases.id, caseRow.id));
         }
         return;
       }
 
-      const validation = validateReply(reasoning.replyText, [ctx.paymentUrl]);
+      const allowedAmount = ctx.amountLabel.match(/[\d,]+(?:\.\d+)?/)?.[0]?.replace(/,/g, "");
+      const validation = validateReply(reasoning.replyText, [ctx.paymentUrl], allowedAmount ? [allowedAmount] : []);
       if (!validation.valid) {
         await escalate(caseRow, `agent_reply_rejected:${validation.failures[0]?.rule ?? "unknown"}`);
         return;
@@ -209,7 +221,12 @@ export async function processAgentReplies({ loadReplyContext }: AgentReplyDeps):
         });
       });
 
-      if (reasoning.needsHuman) await escalate(caseRow, `agent_replied_needs_review:${reasoning.intent}`);
+      if (needsHuman) {
+        const reason = reasoning.needsHuman
+          ? `agent_replied_needs_review:${reasoning.intent}`
+          : `agent_replied_needs_review:${reasoning.intent}:heuristic:${escalationSignals[0]!.rule}`;
+        await escalate(caseRow, reason);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       process.stderr.write(`processAgentReplies: case ${caseRow.id} failed: ${message}\n`);
