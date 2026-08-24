@@ -1,0 +1,1 @@
+ALTER TABLE "outreach" ADD COLUMN "review_sampled" boolean DEFAULT false NOT NULL;

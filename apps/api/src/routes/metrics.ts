@@ -99,8 +99,8 @@ metricsRouter.get("/metrics", requireTenant, async (req, res) => {
 
   const sendCount = sends?.n ?? 0;
   const costMinor = sendCount * COST_PER_SEND_MINOR;
-  const recoveredMinor = sum(recovered, (r) => r.recoveredAmountMinor ?? r.amountMinor);
-  const attributedMinor = sum(attributed, (r) => r.recoveredAmountMinor ?? r.amountMinor);
+  const recoveredMinor = sum(recovered, (r) => r.recoveredAmountMinor);
+  const attributedMinor = sum(attributed, (r) => r.recoveredAmountMinor);
   const contactedCustomers = harm?.total ?? 0;
 
   res.json({
@@ -117,7 +117,7 @@ metricsRouter.get("/metrics", requireTenant, async (req, res) => {
     attributedCount: attributed.length,
     attributedAmountMinor: attributedMinor,
     selfHealedCount: selfHealed.length,
-    selfHealedAmountMinor: sum(selfHealed, (r) => r.recoveredAmountMinor ?? r.amountMinor),
+    selfHealedAmountMinor: sum(selfHealed, (r) => r.recoveredAmountMinor),
 
     contactedCount: contacted.length,
     suppressedCount: suppressed.length,

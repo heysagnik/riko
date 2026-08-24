@@ -4,6 +4,7 @@ import { Skeleton } from "../../components/ui/skeleton.js";
 import { Switch } from "../../components/ui/switch.js";
 import { Tabs, TabsList, TabsTrigger } from "../../components/ui/tabs.js";
 import { useSaveSenderIdentity, useSenderIdentity } from "../../hooks/use-sender-identity.js";
+import { useSaveOutreachSettings } from "../../hooks/use-outreach-settings.js";
 import { cn } from "../../lib/utils.js";
 
 const inputClass =
@@ -111,6 +112,7 @@ const SECTIONS = [
   { id: "sender-identity", label: "Sender identity" },
   { id: "smtp", label: "SMTP" },
   { id: "brand-template", label: "Brand template" },
+  { id: "alerts", label: "Alerts" },
   { id: "send-window", label: "Send window" },
   { id: "pause-outreach", label: "Pause outreach" },
 ];
@@ -118,6 +120,8 @@ const SECTIONS = [
 export function SettingsPage() {
   const { data, isLoading } = useSenderIdentity();
   const save = useSaveSenderIdentity();
+  const saveCap = useSaveOutreachSettings();
+  const identity = data?.senderIdentity ?? undefined;
 
   const [activeSection, setActiveSection] = useState<string>("sender-identity");
 
@@ -129,6 +133,9 @@ export function SettingsPage() {
   const [smtpUser, setSmtpUser] = useState("");
   const [smtpPassword, setSmtpPassword] = useState("");
   const [brandTemplateHtml, setBrandTemplateHtml] = useState("");
+  const [addressLine, setAddressLine] = useState("");
+  const [alertWebhookUrl, setAlertWebhookUrl] = useState("");
+  const [dailySendCap, setDailySendCap] = useState("500");
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
@@ -142,6 +149,9 @@ export function SettingsPage() {
     setSmtpSecure(identity.smtpSecure);
     setSmtpUser(identity.smtpUser ?? "");
     setBrandTemplateHtml(identity.brandTemplateHtml ?? "");
+    setAlertWebhookUrl(identity.alertWebhookUrl ?? "");
+    setAddressLine(identity.addressLine ?? "");
+    if (identity.dailySendCap) setDailySendCap(String(identity.dailySendCap));
   }, [data]);
 
   const smtpPasswordAlreadySet = data?.senderIdentity?.smtpPasswordSet ?? false;
@@ -166,8 +176,9 @@ export function SettingsPage() {
         smtpUser,
         smtpPassword: smtpPassword || undefined,
         brandTemplateHtml: brandTemplateHtml || undefined,
-      });
-      setSmtpPassword("");
+        addressLine: addressLine || undefined,
+        alertWebhookUrl: alertWebhookUrl || undefined,
+      });      setSmtpPassword("");
       setSaved(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save settings.");
@@ -185,7 +196,10 @@ export function SettingsPage() {
   }
 
   const isFormSection =
-    activeSection === "sender-identity" || activeSection === "smtp" || activeSection === "brand-template";
+    activeSection === "sender-identity" ||
+    activeSection === "smtp" ||
+    activeSection === "brand-template" ||
+    activeSection === "alerts";
 
   return (
     <div>
@@ -256,6 +270,17 @@ export function SettingsPage() {
                         className={inputClass}
                         value={fromEmail}
                         onChange={(e) => setFromEmail(e.target.value)}
+                      />
+                    </label>
+                    <label className="block text-sm">
+                      <span className="text-label uppercase text-ink-muted">Postal address (email footer)</span>
+                      <input
+                        type="text"
+                        placeholder="Shop 4, MG Road, Bengaluru 560001"
+                        autoComplete="off"
+                        className={inputClass}
+                        value={addressLine}
+                        onChange={(e) => setAddressLine(e.target.value)}
                       />
                     </label>
                   </div>
@@ -380,6 +405,28 @@ export function SettingsPage() {
                 </section>
               ) : null}
 
+              {activeSection === "alerts" ? (
+                <section>
+                  <h2 className="text-subtitle text-ink">Alerts</h2>
+                  <p className="mt-1 text-sm text-ink-muted">
+                    Riko posts a short message to this webhook when a case needs a person, when your outreach is
+                    paused for safety, or when drafting fails repeatedly. Any incoming-webhook URL that accepts
+                    JSON works.
+                  </p>
+                  <label className="mt-4 block text-sm">
+                    <span className="text-label uppercase text-ink-muted">Webhook URL</span>
+                    <input
+                      type="url"
+                      placeholder="https://hooks.example.com/services/..."
+                      autoComplete="off"
+                      className={inputClass}
+                      value={alertWebhookUrl}
+                      onChange={(e) => setAlertWebhookUrl(e.target.value)}
+                    />
+                  </label>
+                </section>
+              ) : null}
+
               {error ? (
                 <p className="mt-6 rounded-sm border border-lost/30 bg-lost/10 px-3 py-2 text-sm text-lost" role="alert">
                   {error}
@@ -397,46 +444,69 @@ export function SettingsPage() {
 
           {activeSection === "send-window" ? (
             <section>
-              <div className="flex items-baseline justify-between">
-                <h2 className="text-subtitle text-ink">Send window</h2>
-                <span className="text-caption text-ink-faint">Coming soon</span>
-              </div>
-              <p className="mt-1 text-sm text-ink-muted">Outreach respects your timezone and this window.</p>
-              <div className="mt-4 grid grid-cols-2 gap-3">
+              <h2 className="text-subtitle text-ink">Sending limits</h2>
+              <p className="mt-1 text-sm text-ink-muted">
+                The first email in a case goes out whenever it comes due. Follow-ups hold to 7:00–23:00 in the
+                customer's own timezone. No more than this many emails leave your account per day.
+              </p>
+              <div className="mt-4 max-w-xs">
                 <label className="block text-sm">
-                  <span className="text-label uppercase text-ink-muted">Timezone</span>
-                  <input
-                    type="text"
-                    placeholder="America/New_York"
-                    disabled
-                    autoComplete="off"
-                    className={cn(inputClass, "disabled:cursor-not-allowed disabled:opacity-50")}
-                  />
-                </label>
-                <label className="block text-sm">
-                  <span className="text-label uppercase text-ink-muted">Daily cap</span>
+                  <span className="text-label uppercase text-ink-muted">Daily send cap</span>
                   <input
                     type="number"
-                    placeholder="100"
-                    disabled
-                    autoComplete="off"
-                    className={cn(inputClass, "disabled:cursor-not-allowed disabled:opacity-50")}
+                    min={1}
+                    max={10000}
+                    required
+                    className={inputClass}
+                    value={dailySendCap}
+                    onChange={(e) => setDailySendCap(e.target.value)}
                   />
                 </label>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="mt-3"
+                  disabled={saveCap.isPending}
+                  onClick={async () => {
+                    setError(null);
+                    try {
+                      await saveCap.mutateAsync({ dailySendCap: Number(dailySendCap) });
+                      setSaved(true);
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : "Could not save.");
+                    }
+                  }}
+                >
+                  {saveCap.isPending ? "Saving…" : "Save cap"}
+                </Button>
               </div>
             </section>
           ) : null}
 
           {activeSection === "pause-outreach" ? (
-            <section className="flex items-center justify-between">
-              <div>
-                <div className="flex items-baseline gap-2">
+            <section>
+              <div className="flex items-center justify-between">
+                <div>
                   <h2 className="text-subtitle text-ink">Pause outreach</h2>
-                  <span className="text-caption text-ink-faint">Coming soon</span>
+                  <p className="mt-1 max-w-md text-sm text-ink-muted">
+                    Stops every send, reply, and retry immediately. Recovery windows keep counting while paused,
+                    so unpause soon.
+                  </p>
                 </div>
-                <p className="mt-1 text-sm text-ink-muted">No new emails will be sent while paused.</p>
+                <Switch
+                  checked={identity?.outreachPaused ?? false}
+                  disabled={saveCap.isPending || !identity}
+                  onCheckedChange={(checked) => {
+                    setError(null);
+                    saveCap.mutate(
+                      { outreachPaused: checked },
+                      {
+                        onError: (err) => setError(err instanceof Error ? err.message : "Could not save."),
+                      },
+                    );
+                  }}
+                />
               </div>
-              <Switch checked={false} disabled />
             </section>
           ) : null}
         </div>

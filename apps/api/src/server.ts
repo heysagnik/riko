@@ -15,11 +15,21 @@ import { publicPayRouter } from "./routes/public-pay.js";
 import { inboundMailRouter } from "./routes/inbound-mail.js";
 import { auditRouter } from "./routes/audit.js";
 import { policyRouter } from "./routes/policy.js";
+import { reviewsRouter } from "./routes/reviews.js";
+import { trackingRouter } from "./routes/tracking.js";
+import { reportRouter } from "./routes/report.js";
+import { failureCodesRouter } from "./routes/failure-codes.js";
+import { ipRateLimiter, requestLogger } from "./middleware/runtime.js";
+import { closePool } from "@riko/db";
+import { log } from "@riko/worker/logger";
 
 const app = express();
 
 let getWorkerStatus: (() => Record<string, unknown>) | null = null;
 let workerBootError: string | null = null;
+let workerShutdown: (() => Promise<void>) | null = null;
+
+app.use(requestLogger);
 
 app.get("/health", (_req, res) => {
   res.json({
@@ -36,9 +46,11 @@ app.get("/health", (_req, res) => {
 // Providers post here directly, so this stays off the /api prefix.
 app.use(razorpayWebhookRouter);
 
+const loginLimiter = ipRateLimiter(10);
+app.post("/api/auth/*", loginLimiter);
 app.all("/api/auth/*", toNodeHandler(auth));
 
-app.use(express.json());
+app.use(express.json({ limit: "1mb" }));
 app.use(inboundMailRouter);
 
 app.use("/api", casesRouter);
@@ -50,6 +62,11 @@ app.use("/api", publicUnsubscribeRouter);
 app.use("/api", publicPayRouter);
 app.use("/api", auditRouter);
 app.use("/api", policyRouter);
+app.use("/api", reviewsRouter);
+app.use("/api", reportRouter);
+app.use("/api", failureCodesRouter);
+
+app.use(trackingRouter);
 
 // In production the API also serves the built SPA, so the browser sees one
 // origin and the session cookie needs no CORS or SameSite relaxation.
@@ -59,18 +76,31 @@ if (existsSync(webDist)) {
   app.get("*", (_req, res) => {
     res.sendFile(path.join(webDist, "index.html"));
   });
-  process.stdout.write(`serving web from ${webDist}\n`);
 }
 
-const port = Number(process.env.PORT ?? 4000);
-app.listen(port, () => {
-  process.stdout.write(`api listening on ${port}\n`);
+const server = app.listen(process.env.PORT ?? 4000, () => {
+  process.stdout.write(`api listening on ${process.env.PORT ?? 4000}\n`);
+});
+
+async function shutdown(): Promise<void> {
+  log.info("shutdown_started");
+  server.close();
+  if (workerShutdown) await workerShutdown();
+  await closePool();
+  log.info("shutdown_complete");
+  process.exit(0);
+}
+
+process.on("SIGTERM", () => {
+  void shutdown();
+  setTimeout(() => process.exit(1), 10_000).unref();
 });
 
 if (process.env.RUN_WORKER === "1") {
   try {
-    const { runWorker, workerStatus } = await import("@riko/worker/run");
+    const { runWorker, workerStatus, shutdownWorker } = await import("@riko/worker/run");
     getWorkerStatus = workerStatus;
+    workerShutdown = shutdownWorker;
     void runWorker();
   } catch (error) {
     // A failed import must not take the API down with it, and must not be

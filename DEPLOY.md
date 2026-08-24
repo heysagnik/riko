@@ -522,11 +522,62 @@ above. All optional ones have safe defaults for a demo.
 |---|---|---|---|
 | `INBOUND_REPLY_BASE` | For replies | none | Shared base reply address, e.g. `billing@reply.example.com`. Riko appends the per-case tag. Without it, mail carries no `Reply-To` and replies are unroutable. A tenant's own `reply_to` overrides it. |
 | `HOLDOUT_PERCENT` | No | `5` | % of cases held back as the uncontacted control group |
-| `CONTACT_WINDOW_START_HOUR` | No | `0` | Local hour outreach may start. Default is 24×7; set with the pair below to restrict. |
-| `CONTACT_WINDOW_END_HOUR` | No | `24` | Local hour outreach must stop by. Leave unset for round-the-clock sending. |
-| `DEFAULT_CUSTOMER_TIMEZONE` | No | `Asia/Kolkata` | Fallback when a customer has no stored timezone |
+| `DEFAULT_CUSTOMER_TIMEZONE` | No | `Asia/Kolkata` | Fallback when a customer has no stored timezone. The first email in a case sends any time; follow-ups hold to 7:00–23:00 customer-local. |
 | `UNSUBSCRIBE_RATE_LIMIT` | No | `0.1` | Opt-out rate per send that trips the circuit breaker |
+| `PAY_LINK_RATE_LIMIT` | No | `30` | Payment-link resolutions per minute before 429s |
 | `COST_PER_SEND_MINOR` | No | `0` | Assumed cost per email, for the net-recovered metric |
 | `WORKER_POLL_MS` | No | `15000` | How often the in-process worker loop ticks |
 | `NVIDIA_NIM_MODEL` | No | `meta/llama-3.1-8b-instruct` | Drafting model |
 | `NVIDIA_NIM_BASE_URL` | No | NVIDIA's public endpoint | Override for a self-hosted NIM |
+
+## Operations runbook
+
+### Uptime and the worker clock
+
+The state machine assumes time passes: cooldowns, promise dates, and
+contact windows all depend on the tick loop running. On free tiers, Render
+spins the service down when idle and Neon suspends compute — either one
+silently freezes every case. For production use a paid tier, or point an
+external pinger (UptimeRobot or similar) at `/health`. `/health` reports
+worker liveness (`lastTickAt`, `tickCount`, `lastError`) — alert on
+`lastTickAt` going stale.
+
+SIGTERM is handled gracefully: the listener closes, the current tick drains,
+and the DB pool shuts down cleanly (10s force-exit ceiling).
+
+### Single-worker constraint
+
+The tick loop takes a Postgres advisory lock (`riko-worker-tick`) each pass,
+so running two instances will not double-send — but only one does any work.
+Scale the API horizontally if you like; keep exactly one instance with
+`RUN_WORKER=1`.
+
+### Engagement tracking
+
+Sends carry RFC 8058 one-click unsubscribe headers, an open-tracking pixel
+(`GET /t/open/:outreachId`), and clicks are recorded when the customer opens
+the payment link (`GET /public/pay/:caseId`). Bounces arrive as mailer-daemon
+DSNs through the inbound pipeline, which classifies hard vs soft. All of it is
+provider-agnostic: any SMTP relay works, no provider webhook setup required.
+
+### Backups and key escrow
+
+- Enable Neon PITR (paid plans) and verify a restore into a scratch branch at
+  least once before go-live.
+- `APP_ENCRYPTION_KEY` encrypts customer emails and SMTP passwords. Losing it
+  makes both unrecoverable; leaking it exposes them. Store it in your secret
+  manager AND one offline copy. Rotating it requires re-encrypting every
+  encrypted column — plan it as maintenance, not an emergency.
+
+### Sent-mail quality review
+
+Every send is sampled (10%) onto `GET /api/reviews` for a human to read what
+actually went out. Skim it weekly; a drift in tone shows up there before it
+shows up in unsubscribes.
+
+### Alerts
+
+Each tenant sets an alert webhook on the dashboard's Settings → Alerts page.
+Riko posts a short JSON message there when a case is escalated to a human,
+when the circuit breaker pauses outreach, or when drafting fails three times.
+Any incoming-webhook URL that accepts `{text}` works.

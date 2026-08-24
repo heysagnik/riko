@@ -35,7 +35,30 @@ Body: Hi Sam, your Acme invoice for INR 2400.00 is now eight days past its due d
 Body: Hi Sam, this concerns your Acme invoice for INR 2400.00, which fell due on 1 August and remains unpaid after two previous requests. We are asking that you either make payment here: https://example.com/pay/xyz, or contact us directly to arrange settlement. Please treat this as a matter requiring your attention. Unsubscribe: https://example.com/unsub/xyz`,
 };
 
+const RUNG_EXEMPLAR_HINGLISH: Record<string, string> = {
+  instrument_fix: `Subject: Aapka card ending 4242 decline ho gaya
+Body: Hi Sam, is mahine INR 2400.00 ka payment nahi hua kyunki card on file expire ho gaya hai. Kuch cancel nahi hua - card update karne mein bas ek minute lagta hai aur sab wahi se chalu hota hai. Update your payment method: https://example.com/pay/xyz. Agar aap already kar chuke hain, is email ko ignore karein. Unsubscribe: https://example.com/unsub/xyz`,
+
+  resume_checkout: `Subject: Aapka Acme order abhi bhi saved hai
+Body: Hi Sam, aapne INR 2400.00 ka order shuru kiya tha aur wo abhi bhi saved hai. Complete karna ho to sab wahi ka wahi hai, bas ek moment lagta hai. Complete your order: https://example.com/pay/xyz. Agar mann badal gaya hai to bilkul theek baat hai. Unsubscribe: https://example.com/unsub/xyz`,
+
+  reminder: `Subject: INR 2400.00 wali invoice ab due hai
+Body: Hi Sam, chhoti si baat - aapki Acme invoice INR 2400.00 kal due date paar kar gayi hai. Aksar ye bhool jaane se hota hai, to bas ek nudge. Settle it here: https://example.com/pay/xyz. Payment already ho rahi hai to ise ignore karein. Unsubscribe: https://example.com/unsub/xyz`,
+
+  firm: `Subject: INR 2400.00 ki invoice abhi tak unpaid hai
+Body: Hi Sam, aapki Acme invoice INR 2400.00 aath din se overdue hai aur payment nahi mili. Kripya settle it here: https://example.com/pay/xyz, ya reply mein wo date bata dein jis tak payment ho jayegi. Koi dikkat hai to humein batayein. Unsubscribe: https://example.com/unsub/xyz`,
+
+  formal: `Subject: Overdue invoice INR 2400.00 - turant dhyan dein
+Body: Hi Sam, yeh aapki Acme invoice INR 2400.00 ke sambandh mein hai, jo 1 August se due hai aur do pichhli requests ke baad bhi unpaid hai. Hum request karte hain ki make the payment here: https://example.com/pay/xyz, ya seedha contact karein settlement ke liye. Ise gambhirta se lein. Unsubscribe: https://example.com/unsub/xyz`,
+};
+
 function exemplarFor(facts: CaseFacts): string {
+  if (facts.language === "hinglish") {
+    const sample =
+      RUNG_EXEMPLAR_HINGLISH[facts.rung ?? "instrument_fix"] ?? RUNG_EXEMPLAR_HINGLISH.instrument_fix!;
+    return `Example of the tone and shape wanted (different case, do not copy its details):\n\n${sample}`;
+  }
+
   const sample = RUNG_EXEMPLAR[facts.rung ?? "instrument_fix"] ?? RUNG_EXEMPLAR.instrument_fix!;
   return `Example of the tone and shape wanted (different case, do not copy its details):\n\n${sample}`;
 }

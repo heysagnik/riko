@@ -1,22 +1,7 @@
 import { and, eq, gte, isNotNull, sql } from "drizzle-orm";
 import { db, cases, customers, exposures, organization, outreach, senderIdentities } from "@riko/db";
 import { decryptSecret, taggedReplyTo } from "@riko/core";
-
-const DEFAULT_TIMEZONE = process.env.DEFAULT_CUSTOMER_TIMEZONE ?? "Asia/Kolkata";
-
-function localHourFor(timezone: string | null): number {
-  try {
-    return Number(
-      new Intl.DateTimeFormat("en-GB", {
-        timeZone: timezone ?? DEFAULT_TIMEZONE,
-        hour: "numeric",
-        hour12: false,
-      }).format(new Date()),
-    );
-  } catch {
-    return new Date().getHours();
-  }
-}
+import { localHourFor, startOfLocalDay } from "../lib/local-day.js";
 
 const INBOUND_REPLY_BASE = process.env.INBOUND_REPLY_BASE ?? null;
 const APP_BASE_URL = process.env.APP_BASE_URL ?? "https://app.example.com";
@@ -60,8 +45,7 @@ export async function loadReplyContext(caseId: string) {
         }
       : null;
 
-  const since = new Date();
-  since.setHours(0, 0, 0, 0);
+  const since = startOfLocalDay(new Date());
   const [sentToday] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(outreach)

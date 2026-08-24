@@ -60,3 +60,40 @@ export async function createRazorpayPaymentLink(
 
   return { id: body.id, shortUrl: body.short_url };
 }
+
+async function razorpayGet(keyId: string, keySecret: string, path: string): Promise<unknown> {
+  const auth = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
+  const response = await fetch(`${RAZORPAY_API}${path}`, {
+    headers: { authorization: `Basic ${auth}` },
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!response.ok) {
+    throw new Error(`Razorpay GET ${path} failed (${response.status})`);
+  }
+  return response.json();
+}
+
+/**
+ * Resolves the amount a subscription will charge next: subscription -> plan ->
+ * amount. Webhook payloads carry no amount, and every downstream consumer
+ * (review thresholds, metrics, payment links) needs one.
+ */
+export async function fetchRazorpaySubscriptionAmount(
+  keyId: string,
+  keySecret: string,
+  subscriptionId: string,
+): Promise<number | null> {
+  try {
+    const subscription = (await razorpayGet(keyId, keySecret, `/subscriptions/${subscriptionId}`)) as {
+      plan_id?: string;
+    };
+    if (!subscription.plan_id) return null;
+
+    const plan = (await razorpayGet(keyId, keySecret, `/plans/${subscription.plan_id}`)) as {
+      amount?: number;
+    };
+    return typeof plan.amount === "number" ? plan.amount : null;
+  } catch {
+    return null;
+  }
+}

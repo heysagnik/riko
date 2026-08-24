@@ -1,5 +1,6 @@
 import { and, eq, gte, isNotNull, sql } from "drizzle-orm";
 import { db, customers, outreach, senderIdentities } from "@riko/db";
+import { alert, log } from "../lib/logger.js";
 
 const WINDOW_HOURS = 24;
 
@@ -23,7 +24,11 @@ export async function processCircuitBreaker(now: Date = new Date()): Promise<Bre
   const since = new Date(now.getTime() - WINDOW_HOURS * 60 * 60 * 1000);
 
   const senders = await db
-    .select({ tenantId: senderIdentities.tenantId, paused: senderIdentities.outreachPaused })
+    .select({
+      tenantId: senderIdentities.tenantId,
+      paused: senderIdentities.outreachPaused,
+      alertWebhookUrl: senderIdentities.alertWebhookUrl,
+    })
     .from(senderIdentities);
 
   const results: BreakerResult[] = [];
@@ -62,10 +67,25 @@ export async function processCircuitBreaker(now: Date = new Date()): Promise<Bre
         .set({ outreachPaused: true, updatedAt: now })
         .where(eq(senderIdentities.tenantId, sender.tenantId));
 
-      process.stderr.write(
-        `circuit breaker: paused outreach for ${sender.tenantId} - ` +
-          `${unsubscribes} opt-outs across ${sendCount} sends (${(rate * 100).toFixed(1)}%)\n`,
+      alert(
+        "circuit_breaker_paused",
+        {
+          tenantId: sender.tenantId,
+          unsubscribes,
+          sends: sendCount,
+          rate: Number((rate * 100).toFixed(1)),
+        },
+        sender.alertWebhookUrl,
       );
+    }
+
+    if (!tripped && sender.paused) {
+      await db
+        .update(senderIdentities)
+        .set({ outreachPaused: false, updatedAt: now })
+        .where(eq(senderIdentities.tenantId, sender.tenantId));
+
+      log.info("circuit_breaker_resumed", { tenantId: sender.tenantId, rate: Number((rate * 100).toFixed(1)) });
     }
 
     results.push({ tenantId: sender.tenantId, sends: sendCount, unsubscribes, rate, tripped });

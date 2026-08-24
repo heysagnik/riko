@@ -1,22 +1,7 @@
 import { eq, and, desc, gte, isNotNull, sql } from "drizzle-orm";
 import { db, cases, customers, connections, senderIdentities, exposures, payments, outreach } from "@riko/db";
 import type { GateCaseInput } from "@riko/core";
-
-const DEFAULT_TIMEZONE = process.env.DEFAULT_CUSTOMER_TIMEZONE ?? "Asia/Kolkata";
-
-function localHourFor(timezone: string | null): number {
-  try {
-    return Number(
-      new Intl.DateTimeFormat("en-GB", {
-        timeZone: timezone ?? DEFAULT_TIMEZONE,
-        hour: "numeric",
-        hour12: false,
-      }).format(new Date()),
-    );
-  } catch {
-    return new Date().getHours();
-  }
-}
+import { localHourFor, startOfLocalDay } from "../lib/local-day.js";
 
 export async function loadGateInput(caseId: string): Promise<GateCaseInput> {
   const [caseRow] = await db.select().from(cases).where(eq(cases.id, caseId)).limit(1);
@@ -48,8 +33,7 @@ export async function loadGateInput(caseId: string): Promise<GateCaseInput> {
     .orderBy(desc(outreach.sentAt))
     .limit(1);
 
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
+  const startOfDay = startOfLocalDay(new Date());
   const sentToday = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(outreach)

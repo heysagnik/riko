@@ -9,6 +9,7 @@ import {
   caseIdFromRecipient,
   extractPromise,
   stripQuotedContent,
+  safeEqual,
   MIN_PROMISE_CONFIDENCE,
 } from "@riko/core";
 
@@ -32,8 +33,8 @@ const RECORDABLE_STATES = [...OPEN_STATES, "ESCALATED"] as const;
 
 function requireInboundSecret(header: string | undefined): boolean {
   const expected = process.env.INBOUND_MAIL_SECRET;
-  if (!expected) return false;
-  return header === expected;
+  if (!expected || !header) return false;
+  return safeEqual(header, expected);
 }
 
 inboundMailRouter.post("/inbound/mail", async (req, res) => {
@@ -167,25 +168,50 @@ inboundMailRouter.post("/inbound/mail", async (req, res) => {
     return;
   }
 
+  // Suppression is customer-wide and must never fail on a state that lacks the
+  // transition (NEW/DRAFTING/SENDING): mark the person, close every open case
+  // they have, and acknowledge — regardless of where this one case stood.
+  if (classification.kind === "hard_bounce" || classification.kind === "unsubscribe_request") {
+    const isBounce = classification.kind === "hard_bounce";
+    const flag = isBounce ? { bouncedAt: new Date() } : { unsubscribedAt: new Date() };
+    const reason = isBounce ? "hard_bounce" : "customer_unsubscribed";
+
+    await db.transaction(async (tx) => {
+      await tx.update(customers).set(flag).where(eq(customers.id, caseRow.customerId));
+
+      const open = await tx
+        .select({ id: cases.id })
+        .from(cases)
+        .where(and(eq(cases.customerId, caseRow.customerId), inArray(cases.state, [...OPEN_STATES])));
+
+      for (const row of open) {
+        await tx
+          .update(cases)
+          .set({ state: "SKIPPED", closedAt: new Date(), closedReason: reason, awaitingAgentReply: false })
+          .where(and(eq(cases.id, row.id), inArray(cases.state, [...OPEN_STATES])));
+        await appendCaseEvent(tx, {
+          tenantId: caseRow.tenantId,
+          caseId: row.id,
+          fromState: null,
+          toState: "SKIPPED",
+          reason,
+          actor: "system",
+        });
+      }
+    });
+
+    res.json({ status: "applied", caseId: caseRow.id, classification: classification.kind });
+    return;
+  }
+
   const trigger =
-    classification.kind === "hard_bounce"
-      ? ({ type: "hard_bounced" } as const)
-      : classification.kind === "unsubscribe_request"
-        ? ({ type: "customer_unsubscribed" } as const)
-        : usablePromise
-          ? ({ type: "promise_captured" } as const)
-          : ({ type: "customer_replied" } as const);
+    usablePromise
+      ? ({ type: "promise_captured" } as const)
+      : ({ type: "customer_replied" } as const);
 
   const transition = applyTransition(caseRow.state, trigger);
 
   await db.transaction(async (tx) => {
-    if (classification.kind === "hard_bounce") {
-      await tx.update(customers).set({ bouncedAt: new Date() }).where(eq(customers.id, caseRow.customerId));
-    }
-    if (classification.kind === "unsubscribe_request") {
-      await tx.update(customers).set({ unsubscribedAt: new Date() }).where(eq(customers.id, caseRow.customerId));
-    }
-
     await tx
       .update(cases)
       .set({

@@ -1,11 +1,24 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { db, cases, agentActions, outreach, appendCaseEvent } from "@riko/db";
+import { db, cases, agentActions, outreach, senderIdentities, appendCaseEvent } from "@riko/db";
 import { applyTransition } from "@riko/core";
-
-const DRAFT_FRESH_MS = 12 * 60 * 60 * 1000;
 import { runDraftLoop } from "@riko/agent";
 import type { CaseFacts } from "@riko/shared";
+import { llmRateLimiter } from "../lib/rate-limiter.js";
+import { log, alert } from "../lib/logger.js";
+
+const DRAFT_FRESH_MS = 12 * 60 * 60 * 1000;
+const BATCH_LIMIT = 200;
+const REVIEW_SAMPLE_RATE = 0.1;
+
+async function alertWebhookFor(tenantId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ url: senderIdentities.alertWebhookUrl })
+    .from(senderIdentities)
+    .where(eq(senderIdentities.tenantId, tenantId))
+    .limit(1);
+  return row?.url ?? null;
+}
 
 const nim = createOpenAICompatible({
   name: "nvidia-nim",
@@ -16,7 +29,11 @@ const MODEL = process.env.NVIDIA_NIM_MODEL ?? "meta/llama-3.1-8b-instruct";
 const model = nim.chatModel(MODEL);
 
 export async function processDraftingCases(loadFacts: (caseId: string) => Promise<CaseFacts>): Promise<void> {
-  const draftingCases = await db.select().from(cases).where(eq(cases.state, "DRAFTING"));
+  const draftingCases = await db
+    .select()
+    .from(cases)
+    .where(eq(cases.state, "DRAFTING"))
+    .limit(BATCH_LIMIT);
 
   for (const caseRow of draftingCases) {
     try {
@@ -61,6 +78,7 @@ export async function processDraftingCases(loadFacts: (caseId: string) => Promis
 
       const facts = await loadFacts(caseRow.id);
 
+      await llmRateLimiter.acquire();
       const outcome = await runDraftLoop(model, MODEL, caseRow.id, facts, async (entry) => {
         await db.insert(agentActions).values({
           tenantId: caseRow.tenantId,
@@ -77,6 +95,14 @@ export async function processDraftingCases(loadFacts: (caseId: string) => Promis
         outcome.status === "valid"
           ? ({ type: "draft_valid" } as const)
           : ({ type: "draft_invalid_exhausted" } as const);
+
+      if (outcome.status !== "valid") {
+        alert(
+          "draft_validation_exhausted",
+          { caseId: caseRow.id, tenantId: caseRow.tenantId },
+          await alertWebhookFor(caseRow.tenantId),
+        );
+      }
 
       const transition = applyTransition(caseRow.state, trigger);
 
@@ -108,13 +134,39 @@ export async function processDraftingCases(loadFacts: (caseId: string) => Promis
             caseId: caseRow.id,
             subject: outcome.draft.subject,
             body: outcome.draft.bodyText,
+            reviewSampled: Math.random() < REVIEW_SAMPLE_RATE,
           });
         }
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (/Case not found|Missing facts/.test(message)) continue;
-      process.stderr.write(`processDraftingCases: case ${caseRow.id} failed, will retry next tick: ${message}\n`);
+      if (/Case not found/.test(message)) continue;
+      if (/Missing facts/.test(message)) {
+        await skipBrokenCase(caseRow);
+        continue;
+      }
+      log.error("drafting_failed_retry_next_tick", { caseId: caseRow.id, error: message });
     }
   }
+}
+
+async function skipBrokenCase(caseRow: typeof cases.$inferSelect): Promise<void> {
+  await db.transaction(async (tx) => {
+    const claimed = await tx
+      .update(cases)
+      .set({ state: "SKIPPED", closedAt: new Date(), closedReason: "missing_case_data" })
+      .where(and(eq(cases.id, caseRow.id), eq(cases.state, "DRAFTING")))
+      .returning({ id: cases.id });
+
+    if (claimed.length === 0) return;
+
+    await appendCaseEvent(tx, {
+      tenantId: caseRow.tenantId,
+      caseId: caseRow.id,
+      fromState: "DRAFTING",
+      toState: "SKIPPED",
+      reason: "missing_case_data",
+      actor: "system",
+    });
+  });
 }

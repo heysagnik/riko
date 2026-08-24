@@ -10,6 +10,10 @@ export interface SenderIdentity {
   smtpUser: string | null;
   smtpPasswordSet: boolean;
   brandTemplateHtml: string | null;
+  addressLine: string | null;
+  alertWebhookUrl: string | null;
+  outreachPaused: boolean;
+  dailySendCap: number;
 }
 
 export interface SenderIdentityInput {
@@ -22,6 +26,8 @@ export interface SenderIdentityInput {
   smtpUser: string;
   smtpPassword?: string | undefined;
   brandTemplateHtml?: string | undefined;
+  addressLine?: string | undefined;
+  alertWebhookUrl?: string | undefined;
 }
 
 async function fetchSenderIdentity(): Promise<{ senderIdentity: SenderIdentity | null }> {

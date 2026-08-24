@@ -1,0 +1,1 @@
+ALTER TABLE "sender_identities" ADD COLUMN "alert_webhook_url" text;

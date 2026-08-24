@@ -42,7 +42,46 @@ const RUNG_BRIEF: Record<string, string> = {
 - Still no threats: do not mention legal action, collection agencies, credit reporting, or penalties.`,
 };
 
+const HINGLISH_RULES = `Language: write in Hinglish - conversational Hindi in Roman script, naturally mixed
+with common English words (payment, update, link, account). Keep these tokens exactly
+as given, character for character: the amount string, the customer name, both URLs.
+No Devanagari. Short sentences. The tone rules above still apply word-for-word:
+whatever a rung forbids in English is forbidden in Hindi too.`;
+
+const RUNG_BRIEF_HINGLISH: Record<string, string> = {
+  instrument_fix: `Aapki payment fail ho gayi hai, aur sirf cardholder hi ise theek kar sakta hai.
+- Pehle hi line mein batao ki payment nahi hua, aur kyun.
+- Tone: chhota, seedha, bina daraye hue. Ek routine billing notice, collections letter nahi.`,
+
+  resume_checkout: `Koi checkout shuru karke adhoora chhod gaya hai.
+- Kuch kharab nahi hua, koi paisa due nahi hai. Yeh mat likhna ki payment fail hui.
+- Wahi se continue karne ka offer karo. Ek chhota, friendly nudge.`,
+
+  reminder: `Invoice abhi-abhi due date paar kar gaya hai.
+- Maan lo bhool hui hai, kyunki aksar hoti hai.
+- Tone: courteous aur halka. Amount aur due hone ka zikr rakho.`,
+
+  firm: `Pichhli reminder ke baad invoice ek hafte se zyada overdue hai.
+- Tone: seedha aur businesslike, phir bhi polite. Amount aur kitna outstanding hai, saaf likho.
+- Payment ya date maango. Dhamki, legal action, collections ka zikr nahi.`,
+
+  formal: `Invoice teen hafte se overdue hai aur do pichhli requests ka jawab nahi mila.
+- Tone: formal aur spasht. Rakam, original due date, aur yeh ki pichhli requests unanswered rahin.
+- Payment ya turant contact ki request karo. Phir bhi koi dhamki nahi.`,
+};
+
 export function buildSystemPrompt(facts: CaseFacts): string {
+  if (facts.language === "hinglish") {
+    const brief = RUNG_BRIEF_HINGLISH[facts.rung ?? "instrument_fix"] ?? RUNG_BRIEF_HINGLISH.instrument_fix!;
+    return `You write one email on behalf of a merchant.
+
+${brief}
+
+${HINGLISH_RULES}
+
+${BASE_RULES}`;
+  }
+
   const brief = RUNG_BRIEF[facts.rung ?? "instrument_fix"] ?? RUNG_BRIEF.instrument_fix!;
   return `You write one email on behalf of a merchant.
 

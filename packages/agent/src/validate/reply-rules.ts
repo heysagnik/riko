@@ -66,6 +66,11 @@ function extractCurrencyAmounts(text: string): string[] {
   return amounts;
 }
 
+function toNumber(raw: string): number | null {
+  const value = Number(raw.replace(/,/g, ""));
+  return Number.isFinite(value) ? value : null;
+}
+
 export function validateReply(replyText: string, allowedUrls: string[], allowedAmounts: string[] = []): ReplyValidationResult {
   const failures: ReplyValidationFailure[] = [];
 
@@ -91,9 +96,12 @@ export function validateReply(replyText: string, allowedUrls: string[], allowedA
   }
 
   if (allowedAmounts.length > 0) {
-    const allowedSet = new Set(allowedAmounts);
+    const allowedValues = new Set(
+      allowedAmounts.map(toNumber).filter((n): n is number => n !== null),
+    );
     for (const amount of extractCurrencyAmounts(replyText)) {
-      if (!allowedSet.has(amount)) {
+      const value = toNumber(amount);
+      if (value === null || !allowedValues.has(value)) {
         failures.push({ rule: "amount_consistency", detail: `Reply states an amount not given to it: ${amount}` });
       }
     }

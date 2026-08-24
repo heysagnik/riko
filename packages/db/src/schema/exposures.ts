@@ -2,7 +2,7 @@ import { pgTable, text, timestamp, uuid, integer, jsonb, pgEnum, uniqueIndex, in
 import { organization } from "./auth.js";
 import { connections } from "./connections.js";
 import { customers } from "./customers.js";
-import { payments } from "./payments.js";
+import { payments, failureCategoryEnum } from "./payments.js";
 
 export const exposureKindEnum = pgEnum("exposure_kind", [
   "payment_failure",
@@ -26,6 +26,8 @@ export const exposures = pgTable(
     sourceRef: text("source_ref").notNull(),
     paymentId: uuid("payment_id").references(() => payments.id, { onDelete: "set null" }),
     dueAt: timestamp("due_at", { withTimezone: true }),
+    providerRetryAt: timestamp("provider_retry_at", { withTimezone: true }),
+    failureCategory: failureCategoryEnum("failure_category"),
     occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
     resolvedAt: timestamp("resolved_at", { withTimezone: true }),
     raw: jsonb("raw"),

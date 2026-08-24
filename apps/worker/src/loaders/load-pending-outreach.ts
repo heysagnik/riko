@@ -1,9 +1,11 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { db, outreach, cases, customers, organization, senderIdentities } from "@riko/db";
 import { decryptSecret, renderBrandTemplate, taggedReplyTo } from "@riko/core";
+import { getOrCreateRazorpayPayLink } from "../lib/pay-link.js";
 import type { SendableOutreach } from "../jobs/process-sending-cases.js";
 
 const INBOUND_REPLY_BASE = process.env.INBOUND_REPLY_BASE ?? null;
+const APP_BASE_URL = process.env.APP_BASE_URL ?? "https://app.example.com";
 
 function escapeHtml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -136,6 +138,29 @@ export async function loadPendingOutreach(caseId: string): Promise<SendableOutre
   // A tenant-set reply_to still wins, but it must be a domain we receive on.
   const replyToBase = sender.replyTo ?? INBOUND_REPLY_BASE;
 
+  const rendered = renderBrandTemplate(sender.brandTemplateHtml, {
+    content: toParagraphHtml(pending.body),
+    merchantName: tenant?.name ?? sender.fromName,
+  });
+  const pixel = `<img src="${APP_BASE_URL}/t/open/${pending.id}" width="1" height="1" alt="" style="display:none;">`;
+  const bodyHtml = /<\/body>/i.test(rendered)
+    ? rendered.replace(/<\/body>/i, `${pixel}</body>`)
+    : `${rendered}${pixel}`;
+  const unsubscribeUrl = `${APP_BASE_URL}/unsubscribe/${customer.id}`;
+
+  const lazyPayUrl = `${APP_BASE_URL}/pay/${caseId}`;
+  const directPayUrl = await getOrCreateRazorpayPayLink(caseId);
+  const bodyText = directPayUrl ? pending.body.replaceAll(lazyPayUrl, directPayUrl) : pending.body;
+  const renderedBodyHtml = bodyHtml.replaceAll(
+    lazyPayUrl,
+    escapeHtml(directPayUrl ?? lazyPayUrl),
+  );
+
+  const addressFooterText = sender.addressLine ? `\n\n${sender.fromName}\n${sender.addressLine}` : "";
+  const addressFooterHtml = sender.addressLine
+    ? `<p style="margin:20px 0 0;text-align:center;font-size:12px;color:#8b94a3;">${escapeHtml(sender.addressLine)}</p>`
+    : "";
+
   return {
     outreachId: pending.id,
     fromEmail: sender.fromEmail,
@@ -143,11 +168,10 @@ export async function loadPendingOutreach(caseId: string): Promise<SendableOutre
     replyTo: replyToBase ? taggedReplyTo(replyToBase, caseId) : null,
     toEmail: decryptSecret(customer.emailEncrypted, requireEncryptionKey()),
     subject: pending.subject,
-    bodyText: pending.body,
-    bodyHtml: renderBrandTemplate(sender.brandTemplateHtml, {
-      content: toParagraphHtml(pending.body),
-      merchantName: tenant?.name ?? sender.fromName,
-    }),
+    bodyText: `${bodyText}${addressFooterText}`,
+    bodyHtml: `${renderedBodyHtml}${addressFooterHtml}`,
+    addressLine: sender.addressLine,
+    unsubscribeUrl,
     smtp,
   };
 }

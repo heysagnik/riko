@@ -30,6 +30,8 @@ razorpayWebhookRouter.post("/webhooks/razorpay", express.raw({ type: "applicatio
       connectionId: connection.id,
       tenantId: connection.tenantId,
       secret: decryptSecret(connection.webhookSecretEncrypted, encryptionKey),
+      keyId: connection.providerAccountId,
+      keySecret: decryptSecret(connection.accessTokenEncrypted, encryptionKey),
     }));
 
     const result = await handleProviderWebhook({

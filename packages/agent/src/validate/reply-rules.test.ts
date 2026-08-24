@@ -39,4 +39,22 @@ describe("validateReply", () => {
     const result = validateReply(`Hi Sagnik, ${"word ".repeat(200)}`, [LINK]);
     expect(result.failures.map((f) => f.rule)).toContain("reply_length");
   });
+
+  it("accepts the allowed amount written with different separators or precision", () => {
+    const result = validateReply(
+      "Hi Sagnik, the ₹2,400 due is shown in your dashboard. You can pay here: https://riko.sagnik.fun/pay/abc",
+      [LINK],
+      ["2400.00"],
+    );
+    expect(result.valid).toBe(true);
+  });
+
+  it("rejects an amount that was not given", () => {
+    const result = validateReply(
+      "Hi Sagnik, the INR 4800.00 total is due. You can pay here: https://riko.sagnik.fun/pay/abc",
+      [LINK],
+      ["2400.00"],
+    );
+    expect(result.failures.map((f) => f.rule)).toContain("amount_consistency");
+  });
 });

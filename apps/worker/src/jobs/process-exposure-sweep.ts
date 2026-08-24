@@ -2,6 +2,7 @@ import { and, eq, inArray, isNull, lte, notExists, or, sql } from "drizzle-orm";
 import { randomInt } from "node:crypto";
 import { db, cases, exposures, payments, appendCaseEvent } from "@riko/db";
 import { ABANDONMENT_SWEEP_MINUTES } from "@riko/core";
+import { log } from "../lib/logger.js";
 
 const HOLDOUT_PERCENT = Number(process.env.HOLDOUT_PERCENT ?? 5);
 
@@ -92,7 +93,7 @@ export async function processExposureSweep(now: Date = new Date()): Promise<numb
       opened += 1;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      process.stderr.write(`processExposureSweep: exposure ${exposure.id} failed: ${message}\n`);
+      log.error("exposure_case_open_failed", { exposureId: exposure.id, error: message });
     }
   }
 

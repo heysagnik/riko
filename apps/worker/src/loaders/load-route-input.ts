@@ -19,10 +19,12 @@ export async function loadRouteInput(caseId: string): Promise<RouteCaseInput> {
       amountMinor: exposures.amountMinor,
       occurredAt: exposures.occurredAt,
       dueAt: exposures.dueAt,
+      exposureRetryAt: exposures.providerRetryAt,
+      exposureCategory: exposures.failureCategory,
       failureCategory: payments.failureCategory,
       failureSource: payments.failureSource,
       failureCode: payments.failureCode,
-      providerRetryAt: payments.providerRetryAt,
+      paymentRetryAt: payments.providerRetryAt,
     })
     .from(cases)
     .innerJoin(exposures, eq(exposures.id, cases.exposureId))
@@ -49,11 +51,11 @@ export async function loadRouteInput(caseId: string): Promise<RouteCaseInput> {
 
   return {
     exposureKind: row.exposureKind,
-    failureCategory: row.failureCategory ?? "unknown",
+    failureCategory: row.failureCategory ?? row.exposureCategory ?? "unknown",
     failureSource: (row.failureSource as FailureSource | null) ?? "unknown",
     failureCode: row.failureCode,
     amountMinor: row.amountMinor,
-    providerRetryAt: row.providerRetryAt,
+    providerRetryAt: row.paymentRetryAt ?? row.exposureRetryAt,
     occurredAt: row.occurredAt,
     dueAt: row.dueAt,
     attemptCount: row.attemptCount,

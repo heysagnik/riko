@@ -14,11 +14,23 @@ export class SlidingWindowLimiter {
     });
   }
 
-  private pump(): void {
+  tryAcquire(): boolean {
+    this.pruneExpired();
+    if (this.timestamps.length >= this.limit) return false;
+    this.timestamps.push(Date.now());
+    return true;
+  }
+
+  private pruneExpired(): void {
     const now = Date.now();
     while (this.timestamps.length > 0 && now - this.timestamps[0]! >= this.windowMs) {
       this.timestamps.shift();
     }
+  }
+
+  private pump(): void {
+    const now = Date.now();
+    this.pruneExpired();
 
     while (this.queue.length > 0 && this.timestamps.length < this.limit) {
       this.timestamps.push(now);

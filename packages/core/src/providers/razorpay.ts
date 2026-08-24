@@ -154,6 +154,11 @@ function secondsToDate(seconds: number | null | undefined): Date | null {
   return typeof seconds === "number" && seconds > 0 ? new Date(seconds * 1000) : null;
 }
 
+function customerTimezoneFromNotes(notes: Record<string, string> | null | undefined): string | null {
+  const value = notes?.timezone ?? notes?.customer_timezone ?? null;
+  return value && value.trim().length > 0 ? value.trim() : null;
+}
+
 export class RazorpayAdapter implements PaymentProvider {
   readonly id = "razorpay" as const;
 
@@ -219,6 +224,7 @@ export class RazorpayAdapter implements PaymentProvider {
         providerCustomerEmail: payment.email,
         providerCustomerContact: payment.contact ?? null,
         providerCustomerName: customerNameFromPayment(payment, parsed),
+        providerCustomerTimezone: customerTimezoneFromNotes(payment.notes),
         amountMinor: payment.amount,
         currency: payment.currency.toLowerCase(),
         occurredAt: new Date(payment.created_at * 1000),
@@ -269,6 +275,7 @@ export class RazorpayAdapter implements PaymentProvider {
         providerCustomerEmail: email,
         providerCustomerContact: contact,
         providerCustomerName: order.notes?.name ?? order.notes?.customer_name ?? null,
+        providerCustomerTimezone: customerTimezoneFromNotes(order.notes),
         amountMinor: order.amount,
         currency: order.currency.toLowerCase(),
         failureCode: null,
@@ -295,6 +302,7 @@ export class RazorpayAdapter implements PaymentProvider {
         providerCustomerEmail: email,
         providerCustomerContact: contact,
         providerCustomerName: invoice.customer_details?.name ?? null,
+        providerCustomerTimezone: customerTimezoneFromNotes(invoice.notes),
         amountMinor: invoice.amount,
         currency: invoice.currency.toLowerCase(),
         failureCode: null,
@@ -326,6 +334,7 @@ export class RazorpayAdapter implements PaymentProvider {
         providerCustomerEmail: parsed.payload.customer?.entity.email ?? null,
         providerCustomerContact: null,
         providerCustomerName: parsed.payload.customer?.entity.name ?? null,
+        providerCustomerTimezone: customerTimezoneFromNotes(subscription.notes),
         amountMinor: 0,
         currency: "inr",
         failureCode: null,

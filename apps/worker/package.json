@@ -28,6 +28,9 @@
   "exports": {
     ".": "./src/index.ts",
     "./run": "./src/run.ts",
-    "./mailer": "./src/lib/mailer.ts"
+    "./mailer": "./src/lib/mailer.ts",
+    "./rate-limiter": "./src/lib/rate-limiter.ts",
+    "./logger": "./src/lib/logger.ts",
+    "./pay-link": "./src/lib/pay-link.ts"
   }
 }

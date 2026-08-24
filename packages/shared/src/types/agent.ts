@@ -1,10 +1,13 @@
 import type { ExposureKind } from "./case.js";
 
+export type DraftLanguage = "english" | "hinglish";
+
 export interface CaseFacts {
   caseId: string;
   exposureKind: ExposureKind;
   /** Tone the policy engine authorised. The validator rejects drafts that exceed it. */
   rung: string | null;
+  language: DraftLanguage;
   amountMinor: number;
   currency: string;
   failureCategory: string;

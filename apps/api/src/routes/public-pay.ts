@@ -1,12 +1,16 @@
 import { Router } from "express";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
-import { db, cases, customers, exposures, connections, organization } from "@riko/db";
+import { db, cases, customers, exposures, connections, organization, outreach } from "@riko/db";
 import { createRazorpayPaymentLink, decryptSecret } from "@riko/core";
+import { SlidingWindowLimiter } from "@riko/worker/rate-limiter";
 
 export const publicPayRouter = Router();
 
 const paramsSchema = z.object({ caseId: z.string().uuid() });
+
+const LINK_RATE_LIMIT = Number(process.env.PAY_LINK_RATE_LIMIT ?? 30);
+const payLinkLimiter = new SlidingWindowLimiter(LINK_RATE_LIMIT, 60_000);
 
 const OPEN_STATES = ["NEW", "DRAFTING", "SENDING", "WAITING", "PROMISED"] as const;
 
@@ -45,6 +49,10 @@ async function resolvePayLink(rawCaseId: unknown): Promise<PayLinkOk | PayLinkEr
     return { ok: false, status: 400, error: "invalid_link" };
   }
 
+  if (!payLinkLimiter.tryAcquire()) {
+    return { ok: false, status: 429, error: "rate_limited" };
+  }
+
   const [caseRow] = await db.select().from(cases).where(eq(cases.id, parsed.data.caseId)).limit(1);
   if (!caseRow) {
     return { ok: false, status: 404, error: "unknown_link" };
@@ -61,6 +69,16 @@ async function resolvePayLink(rawCaseId: unknown): Promise<PayLinkOk | PayLinkEr
   if (!customer || !exposure) {
     return { ok: false, status: 404, error: "unknown_link" };
   }
+
+  await db
+    .update(outreach)
+    .set({ clickedAt: sql`coalesce(${outreach.clickedAt}, now())` })
+    .where(
+      eq(
+        outreach.id,
+        sql`(select o.id from outreach o where o.case_id = ${caseRow.id} and o.sent_at is not null order by o.created_at desc limit 1)`,
+      ),
+    );
 
   if (customer.unsubscribedAt) {
     return { ok: false, status: 410, error: "case_closed" };

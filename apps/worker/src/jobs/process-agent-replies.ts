@@ -1,10 +1,11 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { db, cases, caseMessages, promises, appendCaseEvent } from "@riko/db";
-import { applyTransition, isWithinContactWindow, extractPromise, MIN_PROMISE_CONFIDENCE } from "@riko/core";
+import { applyTransition, extractPromise, MIN_PROMISE_CONFIDENCE } from "@riko/core";
 import { reasonReply, validateReply, detectEscalationSignals, type ConversationTurn } from "@riko/agent";
 import { getTransporterForSmtpConfig } from "../lib/mailer.js";
 import { llmRateLimiter, processWithConcurrency, roundRobinByTenant } from "../lib/rate-limiter.js";
+import { log } from "../lib/logger.js";
 import type { SendableOutreach } from "./process-sending-cases.js";
 
 const nim = createOpenAICompatible({
@@ -74,7 +75,8 @@ export async function processAgentReplies({ loadReplyContext }: AgentReplyDeps):
   const pending = await db
     .select({ id: cases.id, tenantId: cases.tenantId, state: cases.state, replyCount: cases.agentReplyCount })
     .from(cases)
-    .where(and(inArray(cases.state, [...ANSWERABLE_STATES]), eq(cases.awaitingAgentReply, true)));
+    .where(and(inArray(cases.state, [...ANSWERABLE_STATES]), eq(cases.awaitingAgentReply, true)))
+    .limit(200);
 
   await processWithConcurrency(roundRobinByTenant(pending), REPLY_CONCURRENCY, async (caseRow) => {
     try {
@@ -95,12 +97,11 @@ export async function processAgentReplies({ loadReplyContext }: AgentReplyDeps):
       const ctx = await loadReplyContext(caseRow.id);
       if (!ctx.smtp) return;
 
-      // A reply is still outbound contact, so it answers to the same policy
-      // the ladder does; without this the agent would write at 3am, past the
-      // daily cap, or after the circuit breaker paused the tenant.
+      // The customer is live right now, so the agent answers immediately:
+      // suppression, the tenant pause, and the daily cap still bind, but the
+      // contact window does not gate replies to inbound messages.
       if (ctx.customerSuppressed) return;
       if (ctx.tenantPaused || !ctx.withinDailyCap) return;
-      if (!isWithinContactWindow(ctx.localHour)) return;
 
       const history: ConversationTurn[] = thread.slice(0, -1).map((m) => ({
         role: m.direction === "inbound" ? "customer" : "agent",
@@ -190,7 +191,7 @@ export async function processAgentReplies({ loadReplyContext }: AgentReplyDeps):
           promise ? { type: "promise_captured" } : { type: "agent_answered" },
         );
 
-        await tx
+        const claimed = await tx
           .update(cases)
           .set({
             agentReplyCount: caseRow.replyCount + 1,
@@ -198,7 +199,10 @@ export async function processAgentReplies({ loadReplyContext }: AgentReplyDeps):
             awaitingAgentReply: false,
             ...(promise ? { nextActionAt: promise.promisedFor } : {}),
           })
-          .where(eq(cases.id, caseRow.id));
+          .where(and(eq(cases.id, caseRow.id), eq(cases.state, caseRow.state)))
+          .returning({ id: cases.id });
+
+        if (claimed.length === 0) return;
 
         if (promise) {
           await tx.insert(promises).values({
@@ -229,7 +233,7 @@ export async function processAgentReplies({ loadReplyContext }: AgentReplyDeps):
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      process.stderr.write(`processAgentReplies: case ${caseRow.id} failed: ${message}\n`);
+      log.error("agent_reply_failed", { caseId: caseRow.id, error: message });
     }
   });
 }

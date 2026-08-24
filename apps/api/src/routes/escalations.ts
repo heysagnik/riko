@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { and, desc, eq, inArray, ne } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, ne } from "drizzle-orm";
 import { z } from "zod";
 import {
   db,
@@ -106,7 +106,7 @@ escalationsRouter.post("/escalations/:caseId/resolve", requireTenant, async (req
       const [pending] = await tx
         .select({ id: outreach.id })
         .from(outreach)
-        .where(eq(outreach.caseId, caseId))
+        .where(and(eq(outreach.caseId, caseId), isNull(outreach.sentAt)))
         .orderBy(desc(outreach.id))
         .limit(1);
 

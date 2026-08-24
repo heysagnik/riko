@@ -14,6 +14,9 @@ import {
   GearIcon,
   SunIcon,
   MoonIcon,
+  ChartBarIcon,
+  EnvelopeOpenIcon,
+  BugIcon,
 } from "@phosphor-icons/react";
 import { Logo } from "../../components/logo.js";
 import {
@@ -34,7 +37,10 @@ import { useTheme } from "../../lib/theme.js";
 const navItems = [
   { to: "/dashboard", label: "Overview", end: true, icon: HouseIcon },
   { to: "/dashboard/cases", label: "Cases", end: false, icon: ListChecksIcon },
+  { to: "/dashboard/report", label: "Recovery report", end: false, icon: ChartBarIcon },
   { to: "/dashboard/exceptions", label: "Exceptions", end: false, icon: WarningIcon },
+  { to: "/dashboard/reviews", label: "Sent-mail review", end: false, icon: EnvelopeOpenIcon },
+  { to: "/dashboard/failure-codes", label: "Failure codes", end: false, icon: BugIcon },
   { to: "/dashboard/connections", label: "Connections", end: false, icon: PlugIcon },
   { to: "/dashboard/settings", label: "Settings", end: false, icon: GearIcon },
 ];

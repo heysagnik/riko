@@ -18,5 +18,12 @@ packages/db/scripts/check-*.ts
 packages/db/scripts/verify-*.ts
 packages/db/scripts/wait-*.ts
 
+# Local-only tooling: webhook firing, e2e drives, benchmarks, DB inspection.
+# Kept on disk for debugging, never shipped.
+apps/api/scripts/
+apps/worker/scripts/
+apps/worker/fire.ts
+packages/agent/scripts/
+
 # One-off local script that decrypts values straight out of .env
 scripts/test-smtp-send.mjs

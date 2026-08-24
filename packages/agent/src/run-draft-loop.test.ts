@@ -9,6 +9,7 @@ const facts: CaseFacts = {
   caseId: "case_101",
   exposureKind: "payment_failure",
   rung: "instrument_fix",
+  language: "english",
   daysOverdue: null,
   amountMinor: 5000,
   currency: "usd",

@@ -43,6 +43,7 @@ export interface NormalizedEvent {
   providerCustomerEmail: string | null;
   providerCustomerContact: string | null;
   providerCustomerName: string | null;
+  providerCustomerTimezone: string | null;
   amountMinor: number;
   currency: string;
   failureCode: string | null;

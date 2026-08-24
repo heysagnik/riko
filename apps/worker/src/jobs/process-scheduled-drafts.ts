@@ -3,6 +3,8 @@ import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { db, cases, agentActions, outreach, appendCaseEvent } from "@riko/db";
 import { runDraftLoop } from "@riko/agent";
 import type { CaseFacts } from "@riko/shared";
+import { llmRateLimiter } from "../lib/rate-limiter.js";
+import { log } from "../lib/logger.js";
 
 const nim = createOpenAICompatible({
   name: "nvidia-nim",
@@ -14,6 +16,7 @@ const model = nim.chatModel(MODEL);
 
 const MIN_LEAD_MS = 15 * 60 * 1000;
 const MAX_LEAD_MS = 48 * 60 * 60 * 1000;
+const REVIEW_SAMPLE_RATE = 0.1;
 
 export async function processScheduledDrafts(
   loadFacts: (caseId: string) => Promise<CaseFacts>,
@@ -41,6 +44,7 @@ export async function processScheduledDrafts(
     try {
       const facts = await loadFacts(caseRow.id);
 
+      await llmRateLimiter.acquire();
       const outcome = await runDraftLoop(model, MODEL, caseRow.id, facts, async (entry) => {
         await db.insert(agentActions).values({
           tenantId: caseRow.tenantId,
@@ -69,6 +73,7 @@ export async function processScheduledDrafts(
           subject: outcome.draft.subject,
           body: outcome.draft.bodyText,
           scheduledFor,
+          reviewSampled: Math.random() < REVIEW_SAMPLE_RATE,
         });
 
         await appendCaseEvent(tx, {
@@ -82,7 +87,7 @@ export async function processScheduledDrafts(
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      process.stderr.write(`processScheduledDrafts: case ${caseRow.id} failed: ${message}\n`);
+      log.error("scheduled_draft_failed", { caseId: caseRow.id, error: message });
     }
   }
 }

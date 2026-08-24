@@ -6,6 +6,7 @@ const baseFacts: CaseFacts = {
   caseId: "case_1",
   exposureKind: "payment_failure",
   rung: "instrument_fix",
+  language: "english",
   daysOverdue: null,
   amountMinor: 4999,
   currency: "usd",

@@ -75,6 +75,14 @@ export function routePaymentFailure(input: InterventionInput): Intervention {
         waitUntil: new Date(input.providerRetryAt.getTime() - PROVIDER_RETRY_LEAD_HOURS * HOUR_MS),
       };
     }
+    if (hoursUntilRetry >= -PROVIDER_RETRY_LEAD_HOURS) {
+      return {
+        kind: "outreach_email",
+        reason: "contact_before_provider_retry",
+        waitUntil: null,
+        rung: "instrument_fix",
+      };
+    }
   }
 
   if (input.failureCategory === "insufficient_funds") {

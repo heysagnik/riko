@@ -2,7 +2,7 @@ import { Router } from "express";
 import { eq } from "drizzle-orm";
 import { db, withTenant, senderIdentities } from "@riko/db";
 import { encryptSecret, validateBrandTemplate } from "@riko/core";
-import { senderIdentityUpsertSchema } from "@riko/shared";
+import { senderIdentityUpsertSchema, outreachSettingsPatchSchema } from "@riko/shared";
 import { requireTenant } from "../middleware/require-tenant.js";
 
 export const settingsRouter = Router();
@@ -38,8 +38,35 @@ settingsRouter.get("/settings/sender-identity", requireTenant, async (req, res) 
       smtpUser: identity.smtpUser,
       smtpPasswordSet: Boolean(identity.smtpPasswordEncrypted),
       brandTemplateHtml: identity.brandTemplateHtml,
+      addressLine: identity.addressLine,
+      alertWebhookUrl: identity.alertWebhookUrl,
+      outreachPaused: identity.outreachPaused,
+      dailySendCap: identity.dailySendCap,
     },
   });
+});
+
+settingsRouter.patch("/settings/outreach", requireTenant, async (req, res) => {
+  const tenantId = req.tenant!.tenantId;
+  const body = outreachSettingsPatchSchema.parse(req.body);
+
+  const [existing] = await withTenant(db, tenantId, (tx) =>
+    tx.select({ id: senderIdentities.id }).from(senderIdentities).where(eq(senderIdentities.tenantId, tenantId)).limit(1),
+  );
+
+  if (!existing) {
+    res.status(409).json({ error: "configure_sending_first" });
+    return;
+  }
+
+  await withTenant(db, tenantId, (tx) =>
+    tx
+      .update(senderIdentities)
+      .set({ ...body, updatedAt: new Date() })
+      .where(eq(senderIdentities.tenantId, tenantId)),
+  );
+
+  res.json({ ok: true });
 });
 
 settingsRouter.put("/settings/sender-identity", requireTenant, async (req, res) => {
@@ -78,6 +105,8 @@ settingsRouter.put("/settings/sender-identity", requireTenant, async (req, res) 
     smtpUser: body.smtpUser,
     smtpPasswordEncrypted,
     brandTemplateHtml: body.brandTemplateHtml || null,
+    addressLine: body.addressLine || null,
+    alertWebhookUrl: body.alertWebhookUrl || null,
     updatedAt: new Date(),
   };
 

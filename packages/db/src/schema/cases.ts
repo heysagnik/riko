@@ -17,7 +17,9 @@ export const caseStateEnum = pgEnum("case_state", [
 
 export const caseActorEnum = pgEnum("case_actor", ["system", "agent", "merchant"]);
 
-export const cases = pgTable("cases", {
+export const cases = pgTable(
+  "cases",
+  {
   id: uuid("id").primaryKey().defaultRandom(),
   tenantId: text("tenant_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
   exposureId: uuid("exposure_id").notNull().references(() => exposures.id, { onDelete: "cascade" }),
@@ -38,7 +40,12 @@ export const cases = pgTable("cases", {
   closedAt: timestamp("closed_at", { withTimezone: true }),
   closedReason: text("closed_reason"),
   recoveredAmountMinor: integer("recovered_amount_minor"),
-});
+  },
+  (table) => [
+    index("cases_tenant_opened_idx").on(table.tenantId, table.openedAt),
+    index("cases_tenant_state_idx").on(table.tenantId, table.state),
+  ],
+);
 
 export const caseEvents = pgTable(
   "case_events",

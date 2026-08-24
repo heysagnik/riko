@@ -3,6 +3,7 @@ import nodemailer from "nodemailer";
 import { db, cases, outreach, appendCaseEvent } from "@riko/db";
 import { applyTransition } from "@riko/core";
 import { getTransporterForSmtpConfig, type SmtpConfig } from "../lib/mailer.js";
+import { log } from "../lib/logger.js";
 
 const SEND_CLAIM_TTL_MS = 5 * 60 * 1000;
 
@@ -15,22 +16,26 @@ export interface SendableOutreach {
   subject: string;
   bodyText: string;
   bodyHtml: string;
+  addressLine: string | null;
+  unsubscribeUrl: string;
   smtp: SmtpConfig | null;
 }
 
 export async function processSendingCases(
   loadPendingOutreach: (caseId: string) => Promise<SendableOutreach>,
 ): Promise<void> {
-  const sendingCases = await db.select().from(cases).where(eq(cases.state, "SENDING"));
+  const sendingCases = await db
+    .select()
+    .from(cases)
+    .where(eq(cases.state, "SENDING"))
+    .limit(200);
 
   for (const caseRow of sendingCases) {
     try {
       const pending = await loadPendingOutreach(caseRow.id);
 
       if (!pending.smtp) {
-        process.stderr.write(
-          `Skipping send for case ${caseRow.id}: tenant ${caseRow.tenantId} has no SMTP configured.\n`,
-        );
+        log.error("send_skipped_no_smtp", { caseId: caseRow.id, tenantId: caseRow.tenantId });
         continue;
       }
 
@@ -56,11 +61,15 @@ export async function processSendingCases(
         subject: pending.subject,
         text: pending.bodyText,
         html: pending.bodyHtml,
+        headers: {
+          "List-Unsubscribe": `<${pending.unsubscribeUrl}>`,
+          "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        },
       });
 
       const previewUrl = nodemailer.getTestMessageUrl(info);
       if (previewUrl) {
-        process.stdout.write(`Preview: ${previewUrl}\n`);
+        log.info("smtp_preview_url", { caseId: caseRow.id, previewUrl });
       }
 
       const transition = applyTransition(caseRow.state, { type: "sent" });
@@ -96,7 +105,7 @@ export async function processSendingCases(
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (/No pending outreach|Case not found|Missing customer/.test(message)) continue;
-      process.stderr.write(`processSendingCases: case ${caseRow.id} failed, will retry next tick: ${message}\n`);
+      log.error("send_failed_retry_next_tick", { caseId: caseRow.id, error: message });
     }
   }
 }

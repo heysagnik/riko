@@ -1,7 +1,7 @@
 import type { Database } from "@riko/db";
 import { webhookEvents, customers, payments, exposures, cases, failureCodeMap, appendCaseEvent } from "@riko/db";
 import type { PaymentProvider, ProviderEvent, NormalizedEvent } from "@riko/core";
-import { applyTransition, encryptSecret } from "@riko/core";
+import { applyTransition, encryptSecret, fetchRazorpaySubscriptionAmount } from "@riko/core";
 import { eq, and, desc, inArray } from "drizzle-orm";
 import { randomInt } from "node:crypto";
 
@@ -15,6 +15,8 @@ export interface WebhookConnectionCandidate {
   connectionId: string;
   tenantId: string;
   secret: string;
+  keyId?: string;
+  keySecret?: string;
 }
 
 export interface HandleWebhookInput {
@@ -88,6 +90,22 @@ async function upsertCustomer(
   event: NormalizedEvent,
   encryptionKey: string,
 ): Promise<string> {
+  const values = {
+    tenantId,
+    providerId: event.providerId,
+    providerCustomerId: event.providerCustomerId,
+    emailEncrypted: encryptSecret(event.providerCustomerEmail ?? event.providerCustomerId, encryptionKey),
+    phoneEncrypted: event.providerCustomerContact
+      ? encryptSecret(event.providerCustomerContact, encryptionKey)
+      : null,
+    name: event.providerCustomerName,
+    locale: null,
+    timezone: event.providerCustomerTimezone,
+  };
+
+  const [inserted] = await db.insert(customers).values(values).onConflictDoNothing().returning({ id: customers.id });
+  if (inserted) return inserted.id;
+
   const [existing] = await db
     .select({ id: customers.id })
     .from(customers)
@@ -100,24 +118,8 @@ async function upsertCustomer(
     )
     .limit(1);
 
-  if (existing) return existing.id;
-
-  const [inserted] = await db
-    .insert(customers)
-    .values({
-      tenantId,
-      providerId: event.providerId,
-      providerCustomerId: event.providerCustomerId,
-      emailEncrypted: encryptSecret(event.providerCustomerEmail ?? event.providerCustomerId, encryptionKey),
-      phoneEncrypted: event.providerCustomerContact
-        ? encryptSecret(event.providerCustomerContact, encryptionKey)
-        : null,
-      name: event.providerCustomerName,
-      locale: null,
-    })
-    .returning({ id: customers.id });
-
-  return inserted!.id;
+  if (!existing) throw new Error(`Customer insert conflicted but row is missing: ${event.providerCustomerId}`);
+  return existing.id;
 }
 
 const OPEN_STATES = ["NEW", "DRAFTING", "SENDING", "WAITING", "PROMISED"] as const;
@@ -216,6 +218,77 @@ async function recordPendingExposure(
   return null;
 }
 
+const SUBSCRIPTION_CATEGORY: Record<string, NormalizedEvent["failureCategory"]> = {
+  subscription_retry_pending: "bank_decline",
+  subscription_halted: "invalid_instrument",
+};
+
+/**
+ * Subscription risk is money that will be attempted again (or has stopped being
+ * attempted). One exposure per subscription, refreshed by every event; the
+ * router sequences outreach around the provider's own retry clock.
+ */
+async function recordSubscriptionExposure(
+  db: Database,
+  tenantId: string,
+  connectionId: string,
+  event: NormalizedEvent,
+  encryptionKey: string,
+): Promise<string> {
+  const customerId = await upsertCustomer(db, tenantId, event, encryptionKey);
+  const category = SUBSCRIPTION_CATEGORY[event.kind] ?? "unknown";
+
+  const [exposureRow] = await db
+    .insert(exposures)
+    .values({
+      tenantId,
+      connectionId,
+      customerId,
+      kind: "payment_failure",
+      amountMinor: event.amountMinor,
+      currency: event.currency,
+      sourceRef: event.providerPaymentId,
+      providerRetryAt: event.providerRetryAt,
+      failureCategory: category,
+      occurredAt: event.occurredAt,
+      raw: event.raw as object,
+    })
+    .onConflictDoUpdate({
+      target: [exposures.tenantId, exposures.kind, exposures.sourceRef],
+      set: { providerRetryAt: event.providerRetryAt, resolvedAt: null },
+    })
+    .returning({ id: exposures.id });
+
+  const exposureId = exposureRow!.id;
+
+  const [openCase] = await db
+    .select({ id: cases.id })
+    .from(cases)
+    .where(and(eq(cases.exposureId, exposureId), inArray(cases.state, [...OPEN_STATES])))
+    .limit(1);
+
+  if (openCase) return openCase.id;
+
+  const [caseRow] = await db
+    .insert(cases)
+    .values({ tenantId, exposureId, customerId, state: "NEW", arm: assignArm() })
+    .returning({ id: cases.id });
+
+  await appendCaseEvent(db, {
+    tenantId,
+    caseId: caseRow!.id,
+    fromState: null,
+    toState: "NEW",
+    reason:
+      event.kind === "subscription_retry_pending"
+        ? `subscription_retry_scheduled:${event.providerRetryAt?.toISOString() ?? "unknown"}`
+        : "subscription_halted_needs_mandate_fix",
+    actor: "system",
+  });
+
+  return caseRow!.id;
+}
+
 async function applyNormalizedEvent(
   db: Database,
   tenantId: string,
@@ -231,6 +304,10 @@ async function applyNormalizedEvent(
       event as NormalizedEvent & { kind: "order_created" | "invoice_issued" },
       encryptionKey,
     );
+  }
+
+  if (event.kind === "subscription_retry_pending" || event.kind === "subscription_halted") {
+    return recordSubscriptionExposure(db, tenantId, connectionId, event, encryptionKey);
   }
 
   const customerId = await upsertCustomer(db, tenantId, event, encryptionKey);
@@ -315,7 +392,7 @@ async function applyNormalizedEvent(
     const openCase = match.case;
     const result = applyTransition(openCase.state, { type: "payment_succeeded" });
 
-    await db
+    const claimed = await db
       .update(cases)
       .set({
         state: result.toState,
@@ -323,7 +400,10 @@ async function applyNormalizedEvent(
         closedReason: result.reason,
         recoveredAmountMinor: event.amountMinor,
       })
-      .where(eq(cases.id, openCase.id));
+      .where(and(eq(cases.id, openCase.id), eq(cases.state, openCase.state)))
+      .returning({ id: cases.id });
+
+    if (claimed.length === 0) return null;
 
     await db.update(exposures).set({ resolvedAt: new Date() }).where(eq(exposures.id, match.exposureId));
 
@@ -342,6 +422,35 @@ async function applyNormalizedEvent(
   return null;
 }
 
+/**
+ * Subscription webhooks carry no amount; the router's review threshold, the
+ * payment link we later build, and the metrics all need one. Resolve it from
+ * the provider while the connection credentials are at hand.
+ */
+async function withSubscriptionAmount(
+  db: Database,
+  provider: PaymentProvider,
+  event: ProviderEvent,
+  candidate: WebhookConnectionCandidate,
+): Promise<NormalizedEvent | null> {
+  const normalizedEvent = provider.normalize(event);
+  if (!normalizedEvent) return null;
+
+  if (
+    (normalizedEvent.kind === "subscription_retry_pending" || normalizedEvent.kind === "subscription_halted") &&
+    normalizedEvent.amountMinor === 0 &&
+    candidate.keyId &&
+    candidate.keySecret
+  ) {
+    const amount = await fetchRazorpaySubscriptionAmount(candidate.keyId, candidate.keySecret, normalizedEvent.providerPaymentId);
+    if (amount !== null) {
+      return { ...normalizedEvent, amountMinor: amount };
+    }
+  }
+
+  return normalizedEvent;
+}
+
 export async function handleProviderWebhook(input: HandleWebhookInput): Promise<HandleWebhookResult> {
   const { db, provider, rawBody, headers, candidates, encryptionKey } = input;
 
@@ -352,37 +461,55 @@ export async function handleProviderWebhook(input: HandleWebhookInput): Promise<
   const { event, candidate } = verifyAgainstCandidates(provider, rawBody, headers, candidates);
   const { tenantId, connectionId } = candidate;
 
-  const existing = await db
-    .select({ id: webhookEvents.id })
+  const [existing] = await db
+    .select({ id: webhookEvents.id, status: webhookEvents.status })
     .from(webhookEvents)
     .where(and(eq(webhookEvents.providerId, provider.id), eq(webhookEvents.providerEventId, event.id)))
     .limit(1);
 
-  if (existing.length > 0) {
+  const alreadyRecorded = Boolean(existing);
+  if (existing && existing.status !== "failed") {
     return { status: "duplicate" };
   }
 
-  await db.insert(webhookEvents).values({
-    providerId: provider.id,
-    providerEventId: event.id,
-    status: "received",
-  });
+  if (!alreadyRecorded) {
+    const inserted = await db
+      .insert(webhookEvents)
+      .values({
+        providerId: provider.id,
+        providerEventId: event.id,
+        status: "received",
+      })
+      .onConflictDoNothing()
+      .returning({ id: webhookEvents.id });
 
-  const normalized = provider.normalize(event);
-  if (!normalized) {
-    await db
-      .update(webhookEvents)
-      .set({ status: "ignored", processedAt: new Date() })
-      .where(and(eq(webhookEvents.providerId, provider.id), eq(webhookEvents.providerEventId, event.id)));
-    return { status: "ignored" };
+    if (inserted.length === 0) return { status: "duplicate" };
   }
 
-  const caseId = await applyNormalizedEvent(db, tenantId, connectionId, normalized, encryptionKey);
+  const normalized = await withSubscriptionAmount(db, provider, event, candidate);
 
-  await db
-    .update(webhookEvents)
-    .set({ status: "processed", processedAt: new Date() })
-    .where(and(eq(webhookEvents.providerId, provider.id), eq(webhookEvents.providerEventId, event.id)));
+  try {
+    if (!normalized) {
+      await db
+        .update(webhookEvents)
+        .set({ status: "ignored", processedAt: new Date() })
+        .where(and(eq(webhookEvents.providerId, provider.id), eq(webhookEvents.providerEventId, event.id)));
+      return { status: "ignored" };
+    }
 
-  return { status: "processed", caseId };
+    const caseId = await applyNormalizedEvent(db, tenantId, connectionId, normalized, encryptionKey);
+
+    await db
+      .update(webhookEvents)
+      .set({ status: "processed", processedAt: new Date() })
+      .where(and(eq(webhookEvents.providerId, provider.id), eq(webhookEvents.providerEventId, event.id)));
+
+    return { status: "processed", caseId };
+  } catch (error) {
+    await db
+      .update(webhookEvents)
+      .set({ status: "failed" })
+      .where(and(eq(webhookEvents.providerId, provider.id), eq(webhookEvents.providerEventId, event.id)));
+    throw error;
+  }
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluateGates, describePolicyLimits, isWithinContactWindow, contactWindowIsAllDay } from "./evaluate.js";
+import { evaluateGates, describePolicyLimits, isWithinContactWindow } from "./evaluate.js";
 import type { GateCaseInput } from "./types.js";
 
 const baseInput: GateCaseInput = {
@@ -67,15 +67,25 @@ describe("evaluateGates", () => {
     expect(result).toEqual({ eligible: false, reason: "customer_suppressed" });
   });
 
-  it("sends at any hour by default", () => {
+  it("sends the first email at any hour", () => {
     for (let hour = 0; hour < 24; hour += 1) {
       expect(evaluateGates({ ...baseInput, localHour: hour }).eligible).toBe(true);
     }
   });
 
-  it("still honours a window when one is configured", () => {
-    expect(isWithinContactWindow(3)).toBe(true);
-    expect(contactWindowIsAllDay()).toBe(true);
+  it("holds follow-ups to the daytime window", () => {
+    for (let hour = 0; hour < 24; hour += 1) {
+      const result = evaluateGates({ ...baseInput, attemptCount: 1, localHour: hour });
+      expect(result.eligible).toBe(hour >= 7 && hour < 23);
+      if (!result.eligible) expect(result.reason).toBe("outside_contact_window");
+    }
+  });
+
+  it("bounds the window at 7:00 inclusive and 23:00 exclusive", () => {
+    expect(isWithinContactWindow(6)).toBe(false);
+    expect(isWithinContactWindow(7)).toBe(true);
+    expect(isWithinContactWindow(22)).toBe(true);
+    expect(isWithinContactWindow(23)).toBe(false);
   });
 });
 

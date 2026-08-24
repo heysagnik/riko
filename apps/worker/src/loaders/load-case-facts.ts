@@ -32,6 +32,7 @@ export async function loadCaseFacts(caseId: string): Promise<CaseFacts> {
     caseId,
     exposureKind: exposure.kind,
     rung: caseRow.rung,
+    language: customer.locale === "hinglish" || customer.locale?.startsWith("hi") ? "hinglish" : "english",
     amountMinor: exposure.amountMinor,
     currency: exposure.currency,
     failureCategory: payment?.failureCategory ?? "unknown",
