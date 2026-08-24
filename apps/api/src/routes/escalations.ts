@@ -11,9 +11,10 @@ import {
   outreach,
   caseMessages,
   senderIdentities,
+  organization,
   appendCaseEvent,
 } from "@riko/db";
-import { decryptSecret } from "@riko/core";
+import { decryptSecret, taggedReplyTo, renderBrandTemplate } from "@riko/core";
 import { getTransporterForSmtpConfig } from "@riko/worker/mailer";
 import { requireTenant } from "../middleware/require-tenant.js";
 
@@ -28,10 +29,25 @@ const caseIdSchema = z.object({ caseId: z.string().uuid() });
 
 const HANDOFF_ELIGIBLE_STATES = ["NEW", "DRAFTING", "SENDING", "WAITING", "PROMISED"] as const;
 
+const INBOUND_REPLY_BASE = process.env.INBOUND_REPLY_BASE ?? null;
+
 const replySchema = z.object({
   body: z.string().min(1).max(20_000),
   subject: z.string().max(500).optional(),
 });
+
+function escapeHtml(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function toParagraphHtml(body: string): string {
+  return body
+    .split(/\n{2,}/)
+    .map((para) => para.trim())
+    .filter(Boolean)
+    .map((para) => `<p style="margin:0 0 14px;">${escapeHtml(para).replace(/\n/g, "<br/>")}</p>`)
+    .join("");
+}
 
 function requireEncryptionKey(): string {
   const key = process.env.APP_ENCRYPTION_KEY;
@@ -192,6 +208,43 @@ escalationsRouter.post("/cases/:caseId/hand-off", requireTenant, async (req, res
   res.json(result);
 });
 
+// Closes a case directly, regardless of state, when a person decides Riko
+// should stop working it (e.g. from the case detail page's menu).
+escalationsRouter.post("/cases/:caseId/close", requireTenant, async (req, res) => {
+  const { caseId } = caseIdSchema.parse(req.params);
+  const tenantId = req.tenant!.tenantId;
+
+  const result = await withTenant(db, tenantId, async (tx) => {
+    const [caseRow] = await tx
+      .select()
+      .from(cases)
+      .where(and(eq(cases.id, caseId), eq(cases.tenantId, tenantId)))
+      .limit(1);
+
+    if (!caseRow || caseRow.closedAt) return { ok: false as const, reason: "already_closed" };
+
+    await tx
+      .update(cases)
+      .set({ state: "LOST", closedAt: new Date(), closedReason: "closed_by_merchant" })
+      .where(eq(cases.id, caseId));
+    await appendCaseEvent(tx, {
+      tenantId,
+      caseId,
+      fromState: caseRow.state,
+      toState: "LOST",
+      reason: "closed_by_merchant",
+      actor: "merchant",
+    });
+    return { ok: true as const, state: "LOST" };
+  });
+
+  if (!result.ok) {
+    res.status(409).json({ error: result.reason });
+    return;
+  }
+  res.json(result);
+});
+
 // Only once a case has been handed off: the person composes the message
 // themselves and Riko just delivers it, same as any other outbound turn.
 escalationsRouter.post("/cases/:caseId/reply", requireTenant, async (req, res) => {
@@ -219,6 +272,7 @@ escalationsRouter.post("/cases/:caseId/reply", requireTenant, async (req, res) =
     .from(senderIdentities)
     .where(eq(senderIdentities.tenantId, tenantId))
     .limit(1);
+  const [tenant] = await db.select().from(organization).where(eq(organization.id, tenantId)).limit(1);
 
   if (!customer || !sender?.smtpHost || !sender.smtpPort || !sender.smtpUser || !sender.smtpPasswordEncrypted) {
     res.status(409).json({ error: "sender_not_configured" });
@@ -233,6 +287,7 @@ escalationsRouter.post("/cases/:caseId/reply", requireTenant, async (req, res) =
     .limit(1);
 
   const subject = body.subject?.trim() || (lastMessage?.subject ? `Re: ${lastMessage.subject}` : "Re: your payment");
+  const replyToBase = sender.replyTo ?? INBOUND_REPLY_BASE;
 
   const info = await getTransporterForSmtpConfig({
     host: sender.smtpHost,
@@ -242,10 +297,14 @@ escalationsRouter.post("/cases/:caseId/reply", requireTenant, async (req, res) =
     password: decryptSecret(sender.smtpPasswordEncrypted, key),
   }).sendMail({
     from: `${sender.fromName} <${sender.fromEmail}>`,
-    replyTo: sender.replyTo ?? undefined,
+    replyTo: replyToBase ? taggedReplyTo(replyToBase, caseId) : undefined,
     to: decryptSecret(customer.emailEncrypted, key),
     subject,
     text: body.body,
+    html: renderBrandTemplate(sender.brandTemplateHtml, {
+      content: toParagraphHtml(body.body),
+      merchantName: tenant?.name ?? sender.fromName,
+    }),
     ...(lastMessage?.providerMessageId ? { inReplyTo: lastMessage.providerMessageId } : {}),
   });
 

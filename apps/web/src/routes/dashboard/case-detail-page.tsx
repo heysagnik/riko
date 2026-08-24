@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeftIcon, CaretDownIcon, DetectiveIcon } from "@phosphor-icons/react";
+import { ArrowLeftIcon, CaretDownIcon, DetectiveIcon, DotsThreeVerticalIcon } from "@phosphor-icons/react";
 import {
   STATE_BADGE_VARIANT,
   STATE_LABEL,
@@ -9,11 +9,12 @@ import {
 } from "../../components/case-row.js";
 import { Badge } from "../../components/ui/badge.js";
 import { Button } from "../../components/ui/button.js";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../../components/ui/dropdown-menu.js";
 import { Skeleton } from "../../components/ui/skeleton.js";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip.js";
 import { useCaseDetail, type AgentActionRow, type CaseEventRow, type CaseMessageRow } from "../../hooks/use-case-detail.js";
 import { formatAmount } from "../../hooks/use-cases.js";
-import { useHandOffCase, useReplyToCase } from "../../hooks/use-escalations.js";
+import { useCloseCase, useHandOffCase, useReplyToCase } from "../../hooks/use-escalations.js";
 import { failureLabel, intentLabel, interventionLabel, INTERVENTION_TONE, reasonLabel } from "../../lib/labels.js";
 import { cn } from "../../lib/utils.js";
 
@@ -68,18 +69,19 @@ function day(iso: string): string {
 
 function DraftCard({ draft, sent }: { draft: EmailDraftOutput; sent: boolean }) {
   return (
-    <div className={cn("overflow-hidden rounded-lg border bg-surface-sunk", sent ? "border-accent/40" : "border-line")}>
+    <div className={cn("min-w-0 overflow-hidden rounded-lg border bg-surface-sunk", sent ? "border-accent/40" : "border-line")}>
       <div className="flex items-center justify-between gap-3 border-b border-line px-3 py-2">
         <p className="min-w-0 truncate text-sm font-medium text-ink">{draft.subject}</p>
         {sent ? <Badge variant="accent">Sent</Badge> : null}
       </div>
-      <p className="whitespace-pre-wrap px-3 py-2.5 text-sm leading-relaxed text-ink-muted">{draft.bodyText}</p>
+      <p className="whitespace-pre-wrap break-words px-3 py-2.5 text-sm leading-relaxed text-ink-muted">{draft.bodyText}</p>
     </div>
   );
 }
 
 function ReplyComposer({ caseId }: { caseId: string }) {
   const reply = useReplyToCase();
+  const [open, setOpen] = useState(false);
   const [body, setBody] = useState("");
   const [sent, setSent] = useState(false);
 
@@ -91,32 +93,84 @@ function ReplyComposer({ caseId }: { caseId: string }) {
         onSuccess: () => {
           setBody("");
           setSent(true);
+          setOpen(false);
         },
       },
     );
   };
 
+  if (!open) {
+    return (
+      <div className="mt-6 flex items-center justify-end gap-3">
+        {sent ? <span className="text-caption text-recovered">Sent.</span> : null}
+        <Button size="sm" onClick={() => setOpen(true)}>
+          Reply
+        </Button>
+      </div>
+    );
+  }
+
   return (
-    <section className="rounded-lg border border-accent/30 bg-accent/[0.04] px-4 py-3.5 shadow-sm">
+    <section className="mt-6 rounded-lg border border-accent/30 bg-accent/[0.04] px-4 py-4 shadow-sm">
       <p className="text-label uppercase text-ink-faint">Reply as yourself</p>
       <textarea
-        rows={5}
+        rows={8}
+        autoFocus
         placeholder="Write to the customer…"
         value={body}
         onChange={(e) => {
           setBody(e.target.value);
           setSent(false);
         }}
-        className="mt-2.5 w-full resize-y rounded-sm border border-line-strong bg-surface px-3 py-2 text-sm text-ink outline-none transition-colors duration-150 focus:border-accent"
+        className="mt-2.5 w-full resize-y rounded-sm border border-line-strong bg-surface px-3 py-2.5 text-sm text-ink outline-none transition-colors duration-150 focus:border-accent"
       />
       <div className="mt-2.5 flex items-center gap-3">
         <Button size="sm" onClick={handleSend} disabled={reply.isPending || !body.trim()}>
           {reply.isPending ? "Sending…" : "Send"}
         </Button>
-        {sent ? <span className="text-caption text-recovered">Sent.</span> : null}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            setOpen(false);
+            setBody("");
+          }}
+          disabled={reply.isPending}
+        >
+          Cancel
+        </Button>
         {reply.isError ? <span className="text-caption text-lost">{reply.error.message}</span> : null}
       </div>
     </section>
+  );
+}
+
+function CaseActionsMenu({ caseId, isEscalated }: { caseId: string; isEscalated: boolean }) {
+  const handOff = useHandOffCase();
+  const close = useCloseCase();
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label="Case actions"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-line-strong bg-surface text-ink-muted outline-none transition-colors hover:border-accent hover:text-ink focus-visible:border-accent"
+        >
+          <DotsThreeVerticalIcon size={16} weight="bold" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {isEscalated ? (
+          <DropdownMenuItem onSelect={() => close.mutate(caseId)}>Close the case</DropdownMenuItem>
+        ) : (
+          <>
+            <DropdownMenuItem onSelect={() => handOff.mutate(caseId)}>Hand off</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => close.mutate(caseId)}>Close the case</DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -130,7 +184,7 @@ function SidebarSection({
   className?: string;
 }) {
   return (
-    <section className={cn("rounded-lg border border-line bg-surface px-4 py-3.5 shadow-sm", className)}>
+    <section className={cn("min-w-0 rounded-lg border border-line bg-surface px-4 py-3.5 shadow-sm", className)}>
       <p className="text-label uppercase text-ink-faint">{label}</p>
       <div className="mt-2.5">{children}</div>
     </section>
@@ -155,11 +209,11 @@ function AgentWork({ entries, sentSubject }: { entries: Entry[]; sentSubject: st
   const finalOutput = finalDraft && finalDraft.kind === "action" ? finalDraft.item.output : null;
 
   return (
-    <div>
+    <div className="min-w-0">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="-mx-1 flex min-h-10 w-[calc(100%+8px)] items-center gap-2 rounded-md px-1 text-left text-sm text-ink-muted transition-colors duration-150 hover:text-ink"
+        className="flex min-h-10 w-full items-center gap-2 rounded-md text-left text-sm text-ink-muted transition-colors duration-150 hover:text-ink"
       >
         <CaretDownIcon
           size={14}
@@ -240,9 +294,9 @@ function MessageBubble({ message, customerName }: { message: CaseMessageRow; cus
   const inbound = message.direction === "inbound";
 
   return (
-    <div className={cn("max-w-[85%] rounded-xl border px-3.5 py-2.5", inbound ? "border-line bg-surface" : "border-accent/30 bg-accent/[0.04]")}>
+    <div className={cn("min-w-0 rounded-xl border px-3.5 py-2.5", inbound ? "border-line bg-surface" : "border-accent/30 bg-accent/[0.04]")}>
       {message.subject ? (
-        <p className="border-b border-line pb-1.5 text-sm font-medium text-ink">{message.subject}</p>
+        <p className="border-b border-line pb-1.5 text-sm font-medium text-ink break-words">{message.subject}</p>
       ) : null}
       <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1">
         <span className="text-label uppercase text-ink-muted">{inbound ? customerName : "Sent"}</span>
@@ -254,10 +308,10 @@ function MessageBubble({ message, customerName }: { message: CaseMessageRow; cus
         ) : null}
       </div>
 
-      <p className="mt-2 whitespace-pre-wrap text-sm text-ink">{message.body}</p>
+      <p className="mt-2 whitespace-pre-wrap break-words text-sm text-ink">{message.body}</p>
 
       {message.rationale ? (
-        <p className="mt-2 border-t border-line pt-2 text-caption text-ink-faint">
+        <p className="mt-2 border-t border-line pt-2 text-caption text-ink-faint break-words">
           Riko read this as: {message.rationale}
         </p>
       ) : null}
@@ -269,7 +323,6 @@ export function CaseDetailPage() {
   const { caseId } = useParams<{ caseId: string }>();
   const navigate = useNavigate();
   const { data, isLoading, error, refetch, isRefetching } = useCaseDetail(caseId ?? "");
-  const handOff = useHandOffCase();
 
   const goBack = () => {
     if (window.history.length > 1) navigate(-1);
@@ -303,10 +356,29 @@ export function CaseDetailPage() {
   const { case: caseRow, events, actions, messages, scheduledDraft, customer, payment } = data;
   const isClosed = Boolean(caseRow.closedAt);
   const isEscalated = caseRow.state === "ESCALATED";
-  const canHandOff = !isClosed && !isEscalated;
+
+  // A merchant reply logs both a "merchant_replied" case event and a
+  // caseMessages row for the same action. Fold them into one timeline step
+  // instead of showing "Merchant replied" followed by a mislabeled "Riko
+  // replied" bubble for the same send.
+  const excludedEventIds = new Set<string>();
+  const merchantMessageIds = new Set<string>();
+  const merchantReplyEvents = events.filter((e) => e.reason === "merchant_replied");
+  for (const msg of messages) {
+    if (msg.direction !== "outbound") continue;
+    const match = merchantReplyEvents.find(
+      (e) =>
+        !excludedEventIds.has(e.id) &&
+        Math.abs(new Date(e.createdAt).getTime() - new Date(msg.createdAt).getTime()) < 5000,
+    );
+    if (match) {
+      excludedEventIds.add(match.id);
+      merchantMessageIds.add(msg.id);
+    }
+  }
 
   const entries: Entry[] = [
-    ...events.map((e) => ({ kind: "event" as const, at: e.createdAt, item: e })),
+    ...events.filter((e) => !excludedEventIds.has(e.id)).map((e) => ({ kind: "event" as const, at: e.createdAt, item: e })),
     ...actions.map((a) => ({ kind: "action" as const, at: a.createdAt, item: a })),
     ...messages.map((m) => ({ kind: "message" as const, at: m.createdAt, item: m })),
   ].sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
@@ -334,10 +406,15 @@ export function CaseDetailPage() {
     }
     if (entry.kind === "message") {
       const inbound = entry.item.direction === "inbound";
+      const label = inbound
+        ? `${customer?.name ?? "Customer"} replied`
+        : merchantMessageIds.has(entry.item.id)
+          ? "You replied"
+          : "Riko replied";
       steps.push({
         key: entry.item.id,
         at: entry.at,
-        label: inbound ? `${customer?.name ?? "Customer"} replied` : "Riko replied",
+        label,
         state: caseRow.state,
         agentWork: pending,
         message: entry.item,
@@ -372,7 +449,6 @@ export function CaseDetailPage() {
         Back
       </button>
 
-      {/* Summary header */}
       <header className="mt-4 overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4 px-5 py-4 sm:px-6 sm:py-5">
           <div className="flex min-w-0 items-start gap-3.5">
@@ -398,16 +474,7 @@ export function CaseDetailPage() {
               </p>
               <p className="mt-0.5 text-caption text-ink-faint">at stake</p>
             </div>
-            {canHandOff ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handOff.mutate(caseRow.id)}
-                disabled={handOff.isPending}
-              >
-                {handOff.isPending ? "Handing off…" : "Hand off"}
-              </Button>
-            ) : null}
+            {!isClosed ? <CaseActionsMenu caseId={caseRow.id} isEscalated={isEscalated} /> : null}
           </div>
         </div>
         <div className="border-t border-line bg-surface-sunk px-5 py-2.5 sm:px-6">
@@ -434,9 +501,8 @@ export function CaseDetailPage() {
         </div>
       </header>
 
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[5fr_2fr]">
-        {/* Timeline */}
-        <section className="order-2 lg:order-1">
+      <div className="mt-6 grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[5fr_2fr]">
+        <section className="min-w-0 order-2 lg:order-1">
           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
             <h2 className="text-subtitle text-ink">What happened</h2>
             <a
@@ -487,7 +553,7 @@ export function CaseDetailPage() {
                   <span className="text-caption tabular-nums text-ink-faint">{time(step.at)}</span>
                 </div>
                 {step.message ? (
-                  <div className={cn("mt-2.5 flex", step.message.direction === "inbound" ? "justify-start" : "justify-end")}>
+                  <div className="mt-2.5">
                     <MessageBubble message={step.message} customerName={customer?.name ?? "Customer"} />
                   </div>
                 ) : null}
@@ -499,13 +565,12 @@ export function CaseDetailPage() {
               </li>
             ))}
           </ol>
+
+          {isEscalated ? <ReplyComposer caseId={caseRow.id} /> : null}
         </section>
 
-        {/* Sidebar */}
-        <aside className="order-1 lg:order-2">
+        <aside className="min-w-0 order-1 lg:order-2">
           <div className="space-y-4 lg:sticky lg:top-6">
-            {isEscalated ? <ReplyComposer caseId={caseRow.id} /> : null}
-
             <SidebarSection label="Riko decided">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                 <DetectiveIcon size={16} weight="regular" className="text-ink-muted" />
@@ -534,7 +599,7 @@ export function CaseDetailPage() {
             ) : null}
 
             {scheduledDraft && !isClosed ? (
-              <section className="rounded-lg border border-accent/30 bg-accent/[0.04] px-4 py-3.5 shadow-sm">
+              <section className="min-w-0 rounded-lg border border-accent/30 bg-accent/[0.04] px-4 py-3.5 shadow-sm">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                   <p className="text-label uppercase text-ink-faint">Written and scheduled</p>
                   {scheduledDraft.scheduledFor ? (
@@ -545,8 +610,8 @@ export function CaseDetailPage() {
                     <Badge variant="waiting">Queued to send</Badge>
                   )}
                 </div>
-                <p className="mt-2.5 text-sm font-medium text-ink">{scheduledDraft.subject}</p>
-                <p className="mt-1.5 whitespace-pre-wrap text-sm text-ink-muted">{scheduledDraft.body}</p>
+                <p className="mt-2.5 text-sm font-medium text-ink break-words">{scheduledDraft.subject}</p>
+                <p className="mt-1.5 whitespace-pre-wrap break-words text-sm text-ink-muted">{scheduledDraft.body}</p>
                 <p className="mt-2 border-t border-accent/20 pt-2 text-caption text-ink-faint">
                   Drafted {day(scheduledDraft.createdAt)} at {time(scheduledDraft.createdAt)}. Riko rewrites it if
                   the facts change before it sends.

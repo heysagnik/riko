@@ -26,6 +26,9 @@ const inboundSchema = z.object({
 });
 
 const OPEN_STATES = ["NEW", "DRAFTING", "SENDING", "WAITING", "PROMISED"] as const;
+// A handed-off case is terminal for the state machine, but a person is still
+// reading the thread - their incoming replies must still land somewhere.
+const RECORDABLE_STATES = [...OPEN_STATES, "ESCALATED"] as const;
 
 function requireInboundSecret(header: string | undefined): boolean {
   const expected = process.env.INBOUND_MAIL_SECRET;
@@ -54,17 +57,26 @@ inboundMailRouter.post("/inbound/mail", async (req, res) => {
 
   const taggedCaseId = caseIdFromRecipient([message.to, message.cc, message.headers?.["delivered-to"]]);
 
-  const match = taggedCaseId
-    ? { caseId: taggedCaseId }
-    : messageIds.length > 0
-      ? (
-          await db
-            .select({ caseId: outreach.caseId })
-            .from(outreach)
-            .where(inArray(outreach.providerMessageId, messageIds))
-            .limit(1)
-        )[0]
-      : undefined;
+  // The In-Reply-To/References chain can point at the very first ladder email
+  // (logged in `outreach`) or at a later merchant/agent turn (logged only in
+  // `caseMessages`) - a customer replying to either must still resolve.
+  async function matchByMessageId(): Promise<{ caseId: string } | undefined> {
+    if (messageIds.length === 0) return undefined;
+    const [fromOutreach] = await db
+      .select({ caseId: outreach.caseId })
+      .from(outreach)
+      .where(inArray(outreach.providerMessageId, messageIds))
+      .limit(1);
+    if (fromOutreach) return fromOutreach;
+    const [fromMessages] = await db
+      .select({ caseId: caseMessages.caseId })
+      .from(caseMessages)
+      .where(inArray(caseMessages.providerMessageId, messageIds))
+      .limit(1);
+    return fromMessages;
+  }
+
+  const match = taggedCaseId ? { caseId: taggedCaseId } : await matchByMessageId();
 
   if (!match) {
     res.json({
@@ -85,11 +97,41 @@ inboundMailRouter.post("/inbound/mail", async (req, res) => {
   const [caseRow] = await db
     .select()
     .from(cases)
-    .where(and(eq(cases.id, match.caseId), inArray(cases.state, [...OPEN_STATES])))
+    .where(and(eq(cases.id, match.caseId), inArray(cases.state, [...RECORDABLE_STATES])))
     .limit(1);
 
   if (!caseRow) {
     res.json({ status: "ignored", reason: "case_not_open", classification: classification.kind });
+    return;
+  }
+
+  // Already with a person - just log what the customer said instead of running
+  // it through the (open-state-only) transition logic below.
+  if (caseRow.state === "ESCALATED") {
+    if (classification.kind === "hard_bounce") {
+      await db.update(customers).set({ bouncedAt: new Date() }).where(eq(customers.id, caseRow.customerId));
+    }
+    if (classification.kind === "unsubscribe_request") {
+      await db.update(customers).set({ unsubscribedAt: new Date() }).where(eq(customers.id, caseRow.customerId));
+    }
+
+    const [seqRow] = await db
+      .select({ maxSeq: sql<number>`coalesce(max(${caseMessages.seq}), -1)::int` })
+      .from(caseMessages)
+      .where(eq(caseMessages.caseId, caseRow.id));
+    const maxSeq = seqRow?.maxSeq ?? -1;
+
+    await db.insert(caseMessages).values({
+      tenantId: caseRow.tenantId,
+      caseId: caseRow.id,
+      direction: "inbound",
+      body: message.text,
+      subject: message.subject,
+      providerMessageId: message.headers?.["message-id"] ?? null,
+      seq: maxSeq + 1,
+    });
+
+    res.json({ status: "recorded_while_escalated", caseId: caseRow.id, classification: classification.kind });
     return;
   }
 

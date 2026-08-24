@@ -70,6 +70,25 @@ export function useHandOffCase() {
   });
 }
 
+export function useCloseCase() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (caseId: string) => {
+      const response = await fetch(`/api/cases/${caseId}/close`, { method: "POST" });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error ?? `Failed to close case: ${response.status}`);
+      }
+      return response.json() as Promise<{ ok: true; state: string }>;
+    },
+    onSuccess: (_data, caseId) => {
+      queryClient.invalidateQueries({ queryKey: ["cases", caseId] });
+      queryClient.invalidateQueries({ queryKey: ["escalations"] });
+      queryClient.invalidateQueries({ queryKey: ["cases"] });
+    },
+  });
+}
+
 export function useReplyToCase() {
   const queryClient = useQueryClient();
   return useMutation({

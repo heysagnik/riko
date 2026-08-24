@@ -216,7 +216,7 @@ export function DashboardLayout() {
   );
 
   return (
-    <div className="flex min-h-screen bg-surface md:h-screen md:min-h-0 md:overflow-hidden md:bg-surface-sunk">
+    <div className="fixed inset-0 flex h-full w-full overflow-hidden bg-surface overscroll-none md:bg-surface-sunk">
       <header className="fixed inset-x-0 top-0 z-30 flex items-center gap-2 border-b border-line bg-surface px-3 py-2 md:hidden">
         <button
           type="button"
@@ -249,13 +249,13 @@ export function DashboardLayout() {
 
       <main
         className={cn(
-          "relative flex min-w-0 flex-1 flex-col pt-14 md:pt-0",
+          "relative flex min-w-0 max-w-full flex-1 flex-col pt-14 md:pt-0",
           "md:my-2 md:mr-2 md:min-h-0 md:overflow-hidden md:rounded-xl md:bg-surface md:shadow-sm",
         )}
       >
         <SiteHeader onToggleSidebar={toggleSidebar} />
-        <div className="min-h-0 flex-1 md:overflow-y-auto">
-          <div className="max-w-7xl px-4 py-6 sm:px-6 md:px-8 md:py-8">
+        <div className="min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain">
+          <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 md:px-8 md:py-8">
             <TooltipProvider delayDuration={200}>
               <Outlet />
             </TooltipProvider>
