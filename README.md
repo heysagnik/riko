@@ -18,63 +18,91 @@ Riko decouples recovery policy from message generation: a deterministic policy e
 
 ---
 
-## Architecture
+## System Architecture & Data Flow
 
 ```mermaid
-flowchart TD
-    subgraph Ingest["1. Ingestion Layer"]
-        RP["Razorpay / Stripe Webhooks"]
-        CF["Cloudflare Inbound Email"]
+flowchart TB
+    %% Class Styles
+    classDef ext fill:#f8fafc,stroke:#64748b,stroke-width:1.5px,color:#0f172a
+    classDef api fill:#f0f9ff,stroke:#0284c7,stroke-width:1.5px,color:#0369a1
+    classDef worker fill:#faf5ff,stroke:#9333ea,stroke-width:1.5px,color:#581c87
+    classDef agent fill:#f5f3ff,stroke:#7c3aed,stroke-width:1.5px,color:#4c1d95
+    classDef db fill:#ecfdf5,stroke:#059669,stroke-width:1.5px,color:#064e3b
+    classDef ui fill:#eff6ff,stroke:#2563eb,stroke-width:1.5px,color:#1e3a8a
+    classDef gate fill:#fffbeb,stroke:#d97706,stroke-width:1.5px,color:#78350f
+
+    %% 1. Ingestion
+    subgraph S1["1. Event Ingestion & Webhook Gateway"]
+        direction TB
+        GATEWAYS["Payment Gateways\n• Razorpay (payment.failed, invoice.paid)\n• Stripe (charge.failed, invoice.payment_failed)"]:::ext
+        CF_INBOUND["Cloudflare Inbound Email\n• PostalMime RFC 5322 parser\n• billing+<caseId>@reply.domain.com"]:::ext
+        WH_EP["apps/api · Webhook Ingestion\n• HMAC-SHA256 signature verification\n• Raw body candidate matching\n• Idempotent webhook event ledger"]:::api
+        INB_EP["apps/api · /inbound/mail Endpoint\n• x-riko-inbound-secret authorization\n• Quote stripping & address tag extraction\n• Inbound classifier (bounce/unsub/reply)"]:::api
     end
 
-    subgraph API["apps/api (Express REST API)"]
-        AUTH["Better Auth & Sessions"]
-        WH["Webhook Ingestion & HMAC Verify"]
-        INB["/inbound/mail Parser"]
-        ESC["Escalations & Manual Actions"]
-        PUB["Public Payment & Unsub URLs"]
+    %% 2. Database & State
+    subgraph S2["2. Relational Schema & Cryptographic Ledger (packages/db)"]
+        direction TB
+        DB_TENANT["Multi-Tenant PostgreSQL (Neon)\n• withTenant(db, tenantId, query) scoping"]:::db
+        ENCRYPT_PII["AES-256-GCM Encryption\n• emailEncrypted & phoneEncrypted at rest"]:::db
+        TABLES["Core Tables\n• exposures · cases · caseMessages\n• outreach · promises · agentActions"]:::db
+        HASH_LEDGER["Tamper-Evident SHA-256 Ledger\nhash = SHA-256(prevHash, caseId, seq, states, reason, actor, ts)"]:::db
     end
 
-    subgraph Storage["Data & Multi-Tenancy (packages/db)"]
-        DB[("Neon PostgreSQL")]
-        RLS["withTenant Scoping"]
-        PII["AES-256-GCM Encrypted PII"]
-        LEDGER["SHA-256 Hash Chain Ledger"]
+    %% 3. Recovery Daemon
+    subgraph S3["3. Autonomous Recovery Daemon Loop (apps/worker)"]
+        direction TB
+        POLL_LOCK["PostgreSQL Advisory Lock\nSELECT pg_try_advisory_lock('riko-worker-tick')\nRuns 10 background jobs every 15s"]:::worker
+        
+        subgraph WorkerJobs["Sequenced Worker Pipeline"]
+            direction TB
+            J1["processCircuitBreaker ➔ Auto-pause if bounce/unsub spike"]:::gate
+            J2["processPromises ➔ NLP promise due date tracking"]:::gate
+            J3["processWaitingCases ➔ 48h cooldown & retry evaluation"]:::gate
+            J4["processNewCases ➔ 10-Gate Evaluator & Policy Router"]:::gate
+            
+            subgraph AgentLoop["AI Drafting & AST Validation Loop (packages/agent)"]
+                LLM_REASON["1. LLM Reasoner (NVIDIA NIM · Llama 3.1 8B)\n• Evaluates failure code & merchant fault\n• Selects Tone Rung (instrument_fix, reminder, firm, etc.)"]:::agent
+                LLM_DRAFT["2. Structured Email Drafter\n• Generates subject, bodyText, bodyHtml JSON"]:::agent
+                VALID_PASS{"3. AST / Regex Validation Barrier\n• Exact amount & customer name match\n• Blocklist check: no discounts/waivers\n• URL allowlist: only pay & unsub URLs\n• Length: 40-160 words, subject < 78 chars"}:::gate
+                SCORE_EVAL["4. Quality Scorer (0-100 Rating)\n• Rewards clarity, penalizes corporate filler"]:::agent
+            end
+            
+            J5["processDraftingCases ➔ Runs Agent loop with 3x error retry"]:::worker
+            J6["processSendingCases ➔ Nodemailer SMTP dispatch with List-Unsubscribe"]:::worker
+            J7["processAgentReplies ➔ Conversational thread multi-turn replies"]:::worker
+        end
     end
 
-    subgraph Daemon["apps/worker (Recovery Loop)"]
-        LOCK["Postgres Advisory Lock"]
-        GATES["Send Gates Evaluator"]
-        ROUTER["Deterministic Policy Router"]
-        DRAFT["LLM Drafter (NVIDIA NIM)"]
-        VALID["Post-Draft AST Validator"]
-        DISPATCH["SMTP Dispatch (Nodemailer)"]
+    %% 4. Dashboard & Operations
+    subgraph S4["4. Operations Dashboard (apps/web)"]
+        direction TB
+        DASH_UI["React 18 + Vite + Tailwind CSS"]:::ui
+        CASE_EXP["Live Case Inspector\n• Real-time state timeline\n• Full action & message thread"]:::ui
+        ESC_INBOX["Human Escalations Inbox\n• Approve send / close / return"]:::ui
+        METRICS_VIEW["Holdout ROI Analytics\n• Treatment Rate vs Holdout Rate\n• Incremental Lift calculation"]:::ui
+        AUDIT_VERIFY["Cryptographic Audit Verifier\n• Traverses and verifies SHA-256 chain"]:::ui
     end
 
-    subgraph UI["apps/web (Dashboard)"]
-        DASH["React 18 + Vite + Tailwind"]
-        INSPECT["Real-Time Case Inspector"]
-        AUDIT["Audit Chain Verifier"]
-    end
+    %% Ingestion Links
+    GATEWAYS -->|Raw Webhook Payload| WH_EP
+    CF_INBOUND -->|JSON Stream| INB_EP
+    WH_EP -->|Upsert Normalized Event| S2
+    INB_EP -->|Append Inbound Turn| S2
 
-    RP --> WH
-    CF --> INB
-    WH --> DB
-    INB --> DB
+    %% Worker Execution Links
+    POLL_LOCK --> WorkerJobs
+    S2 <-->|Poll Pending Cases| J4
+    J4 --> LLM_REASON --> LLM_DRAFT --> VALID_PASS
+    VALID_PASS -- "Pass" --> SCORE_EVAL --> J5 --> J6
+    VALID_PASS -- "Fail (<3x)" -->|Structured Error Feedback| LLM_DRAFT
+    VALID_PASS -- "Fail (>=3x)" -->|Escalate to Human| S2
+    J6 -->|Dispatch Email via Verified SMTP| GATEWAYS
+    J6 -->|Record Outreach & Hash Event| S2
+    J7 <-->|Thread Context & Reply| S2
 
-    LOCK --> GATES
-    GATES --> ROUTER
-    ROUTER --> DRAFT
-    DRAFT --> VALID
-    VALID --> DISPATCH
-    DISPATCH --> DB
-
-    DB --- RLS
-    DB --- PII
-    DB --- LEDGER
-
-    DB <--> API
-    API <--> UI
+    %% UI Links
+    S2 <-->|REST API + Better Auth| S4
 ```
 
 ### Monorepo Structure
