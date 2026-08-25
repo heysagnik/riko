@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { renderBrandTemplate, validateBrandTemplate, DEFAULT_BRAND_TEMPLATE } from "./brand-template.js";
+import {
+  BRAND_TEMPLATE_DARK_CSS,
+  DEFAULT_BRAND_TEMPLATE,
+  renderBrandTemplate,
+  validateBrandTemplate,
+} from "./brand-template.js";
 
 describe("validateBrandTemplate", () => {
   it("requires a content placeholder", () => {
@@ -59,5 +64,29 @@ describe("renderBrandTemplate", () => {
       merchantName: "Acme",
     });
     expect(html.match(/Acme/g)).toHaveLength(2);
+  });
+});
+
+describe("DEFAULT_BRAND_TEMPLATE theming", () => {
+  it("declares dark-mode support and adapts to it", () => {
+    expect(DEFAULT_BRAND_TEMPLATE).toContain('name="color-scheme" content="light dark"');
+    expect(DEFAULT_BRAND_TEMPLATE).toContain("@media (prefers-color-scheme: dark)");
+    expect(DEFAULT_BRAND_TEMPLATE).toContain(BRAND_TEMPLATE_DARK_CSS);
+  });
+
+  it("exposes class hooks for the CTA button and content", () => {
+    expect(DEFAULT_BRAND_TEMPLATE).toContain('class="riko-body"');
+    expect(DEFAULT_BRAND_TEMPLATE).toContain(".riko-btn { background: #f2f4f7 !important; }");
+    expect(DEFAULT_BRAND_TEMPLATE).toContain(".riko-btn-label { color: #111111 !important; }");
+  });
+
+  it("keeps inline light styles as the fallback for clients without dark support", () => {
+    expect(DEFAULT_BRAND_TEMPLATE).toContain("background:#ffffff");
+    expect(DEFAULT_BRAND_TEMPLATE).not.toContain("background:#ffffff !important");
+  });
+
+  it("renders the themed default when no template is set", () => {
+    const html = renderBrandTemplate(null, { content: "<p>hi</p>", merchantName: "Acme" });
+    expect(html).toContain("@media (prefers-color-scheme: dark)");
   });
 });

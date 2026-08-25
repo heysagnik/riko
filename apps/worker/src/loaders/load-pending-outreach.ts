@@ -26,8 +26,8 @@ function renderButton(label: string, url: string): string {
   const displayLabel = normalizePaymentCta(label);
   return (
     `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:4px 0 20px;">` +
-    `<tr><td style="background:#111111;">` +
-    `<a href="${escapeHtml(url)}" style="display:inline-block;padding:11px 18px;font-size:14px;font-weight:500;` +
+    `<tr><td class="riko-btn" style="background:#111111;">` +
+    `<a href="${escapeHtml(url)}" class="riko-btn-label" style="display:inline-block;padding:11px 18px;font-size:14px;font-weight:500;` +
     `color:#ffffff;text-decoration:none;font-family:inherit;">${escapeHtml(displayLabel)}</a>` +
     `</td></tr></table>`
   );
@@ -36,7 +36,7 @@ function renderButton(label: string, url: string): string {
 function renderFooterLink(label: string, url: string): string {
   return (
     `<p style="margin:20px 0 0;font-size:12px;">` +
-    `<a href="${escapeHtml(url)}" style="color:#9ca3af;text-decoration:underline;">${escapeHtml(label)}</a>` +
+    `<a href="${escapeHtml(url)}" class="riko-unsub" style="color:#9ca3af;text-decoration:underline;">${escapeHtml(label)}</a>` +
     `</p>`
   );
 }
@@ -76,7 +76,7 @@ function renderParagraph(paragraph: string): string[] {
       flushInline();
       blocks.push(/^unsubscribe$/i.test(label) ? renderFooterLink(label, url) : renderButton(label, url));
     } else {
-      inline += `${escapeHtml(before)}<a href="${escapeHtml(url)}" style="color:#2563eb;">${escapeHtml(url)}</a>`;
+      inline += `${escapeHtml(before)}<a href="${escapeHtml(url)}" class="riko-link" style="color:#2563eb;">${escapeHtml(url)}</a>`;
     }
 
     cursor = idx + url.length + trailingPunctuation.length;
@@ -158,7 +158,7 @@ export async function loadPendingOutreach(caseId: string): Promise<SendableOutre
 
   const addressFooterText = sender.addressLine ? `\n\n${sender.fromName}\n${sender.addressLine}` : "";
   const addressFooterHtml = sender.addressLine
-    ? `<p style="margin:20px 0 0;text-align:center;font-size:12px;color:#8b94a3;">${escapeHtml(sender.addressLine)}</p>`
+    ? `<p class="riko-address" style="margin:20px 0 0;text-align:center;font-size:12px;color:#8b94a3;">${escapeHtml(sender.addressLine)}</p>`
     : "";
 
   return {

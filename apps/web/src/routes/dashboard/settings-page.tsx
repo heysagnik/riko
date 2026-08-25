@@ -1,10 +1,17 @@
 import { useEffect, useState } from "react";
+import {
+  BRAND_TEMPLATE_DARK_CSS,
+  BRAND_TEMPLATE_LIGHT_CSS,
+  CONTENT_PLACEHOLDER,
+  DEFAULT_BRAND_TEMPLATE,
+} from "@riko/core/outreach/brand-template";
 import { Button } from "../../components/ui/button.js";
 import { Skeleton } from "../../components/ui/skeleton.js";
 import { Switch } from "../../components/ui/switch.js";
 import { Tabs, TabsList, TabsTrigger } from "../../components/ui/tabs.js";
 import { useSaveSenderIdentity, useSenderIdentity } from "../../hooks/use-sender-identity.js";
 import { useSaveOutreachSettings } from "../../hooks/use-outreach-settings.js";
+import { useTheme, type ResolvedTheme } from "../../lib/theme.js";
 import { cn } from "../../lib/utils.js";
 
 const inputClass =
@@ -22,8 +29,8 @@ const LABEL_PATTERN = /([A-Za-z][\w '-]{2,60}):\s*$/;
 function renderButton(label: string, url: string): string {
   return (
     `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:4px 0 20px;">` +
-    `<tr><td style="background:#111111;">` +
-    `<a href="${escapeHtml(url)}" style="display:inline-block;padding:11px 18px;font-size:14px;font-weight:500;` +
+    `<tr><td class="riko-btn" style="background:#111111;">` +
+    `<a href="${escapeHtml(url)}" class="riko-btn-label" style="display:inline-block;padding:11px 18px;font-size:14px;font-weight:500;` +
     `color:#ffffff;text-decoration:none;font-family:inherit;">${escapeHtml(normalizePaymentCta(label))}</a>` +
     `</td></tr></table>`
   );
@@ -40,7 +47,7 @@ function normalizePaymentCta(label: string): string {
 function renderFooterLink(label: string, url: string): string {
   return (
     `<p style="margin:20px 0 0;font-size:12px;">` +
-    `<a href="${escapeHtml(url)}" style="color:#9ca3af;text-decoration:underline;">${escapeHtml(label)}</a>` +
+    `<a href="${escapeHtml(url)}" class="riko-unsub" style="color:#9ca3af;text-decoration:underline;">${escapeHtml(label)}</a>` +
     `</p>`
   );
 }
@@ -80,7 +87,7 @@ function renderParagraph(paragraph: string): string[] {
       flushInline();
       blocks.push(/^unsubscribe$/i.test(label) ? renderFooterLink(label, url) : renderButton(label, url));
     } else {
-      inline += `${escapeHtml(before)}<a href="${escapeHtml(url)}" style="color:#2563eb;">${escapeHtml(url)}</a>`;
+      inline += `${escapeHtml(before)}<a href="${escapeHtml(url)}" class="riko-link" style="color:#2563eb;">${escapeHtml(url)}</a>`;
     }
 
     cursor = idx + url.length + trailingPunctuation.length;
@@ -100,20 +107,20 @@ function toParagraphHtml(body: string): string {
 
 const SAMPLE_BODY = toParagraphHtml(SAMPLE_TEXT);
 
-const FALLBACK_TEMPLATE = `<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;padding:24px;background:#f5f6f8;">
-  <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e4e7ec;border-radius:8px;">
-    <div style="padding:20px 24px;border-bottom:1px solid #e4e7ec;font-weight:600;">{{merchant_name}}</div>
-    <div style="padding:24px;font-size:14px;line-height:1.6;color:#1f2430;">{{content}}</div>
-  </div>
-</div>`;
-
-function buildPreview(template: string, merchantName: string): string {
-  const source = template.includes("{{content}}") ? template : FALLBACK_TEMPLATE;
-  return source
-    .split("{{content}}")
+function buildPreview(template: string, merchantName: string, resolvedTheme: ResolvedTheme): string {
+  const source = template.includes(CONTENT_PLACEHOLDER) ? template : DEFAULT_BRAND_TEMPLATE;
+  const html = source
+    .split(CONTENT_PLACEHOLDER)
     .join(SAMPLE_BODY)
     .split("{{merchant_name}}")
     .join(merchantName || "Your business");
+
+  const forcedStyle = `<style>${
+    resolvedTheme === "dark" ? BRAND_TEMPLATE_DARK_CSS : BRAND_TEMPLATE_LIGHT_CSS
+  }</style>`;
+  return html.includes("</head>")
+    ? html.replace(/<\/head>/i, `${forcedStyle}</head>`)
+    : `${html}${forcedStyle}`;
 }
 
 const SECTIONS = [
@@ -130,6 +137,7 @@ export function SettingsPage() {
   const save = useSaveSenderIdentity();
   const saveCap = useSaveOutreachSettings();
   const identity = data?.senderIdentity ?? undefined;
+  const { resolvedTheme } = useTheme();
 
   const [activeSection, setActiveSection] = useState<string>("sender-identity");
 
@@ -400,13 +408,13 @@ export function SettingsPage() {
                           title="Brand template preview"
                           className="h-[420px] w-full border-0"
                           sandbox=""
-                          srcDoc={buildPreview(brandTemplateHtml, fromName)}
+                          srcDoc={buildPreview(brandTemplateHtml, fromName, resolvedTheme)}
                         />
                       </div>
                     </div>
                   </div>
 
-                  {brandTemplateHtml && !brandTemplateHtml.includes("{{content}}") ? (
+                  {brandTemplateHtml && !brandTemplateHtml.includes(CONTENT_PLACEHOLDER) ? (
                     <p className="mt-3 text-sm text-waiting">
                       Template has no {"{{content}}"} placeholder, so Riko's message would have nowhere to go. The
                       default template will be used until you add one.

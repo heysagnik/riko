@@ -12,7 +12,7 @@ import { failureLabel } from "../../lib/labels.js";
 import { cn } from "../../lib/utils.js";
 
 const DECISION_TONE: Record<string, string> = {
-  outreach_email: "bg-accent",
+  outreach_email: "bg-recovered",
   wait_until: "bg-waiting",
   no_action_provider_retrying: "bg-ink-faint",
   escalate_human: "bg-lost",
@@ -141,7 +141,7 @@ export function OverviewPage() {
 
       {needsAttention > 0 ? (
         <Link
-          to="/dashboard/needs-you"
+          to="/dashboard/cases?state=NEEDS_YOU"
           className="mt-8 flex items-center justify-between gap-4 rounded-lg border border-line px-4 py-3.5 transition-colors duration-150 hover:bg-surface-sunk"
         >
           <span className="text-sm text-ink">

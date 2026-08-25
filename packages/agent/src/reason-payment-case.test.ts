@@ -73,6 +73,30 @@ describe("reasonPaymentCase", () => {
     expect(result.rationale).toContain("Deterministic override");
   });
 
+  it("downgrades a model stop on a benign code to contact", async () => {
+    const paranoid = `{"decision":"stop","confidence":0.9,"rationale":"Expired card means compromised instrument.","rung":null,"waitHours":null}`;
+    const result = await reasonPaymentCase(modelReturning(paranoid), {
+      ...input,
+      failureCode: "payment_expired_card",
+      failureDescription: "Your card has expired.",
+      failureSourceHint: "customer",
+    });
+    expect(result.decision).toBe("contact");
+    expect(result.rung).toBe("instrument_fix");
+    expect(result.rationale).toContain("not a compromise signal");
+  });
+
+  it("keeps a model stop when the description alleges fraud on an unmapped code", async () => {
+    const fraudStop = `{"decision":"stop","confidence":0.8,"rationale":"Description says stolen card.","rung":null,"waitHours":null}`;
+    const result = await reasonPaymentCase(modelReturning(fraudStop), {
+      ...input,
+      failureCode: "some_new_code",
+      failureDescription: "Customer reported the card as stolen.",
+      failureSourceHint: "issuer",
+    });
+    expect(result.decision).toBe("stop");
+  });
+
   it("still stops on fraud even from a business source", async () => {
     const contact = `{"decision":"contact","confidence":0.9,"rationale":"Customer can retry.","rung":"instrument_fix","waitHours":null}`;
     const result = await reasonPaymentCase(modelReturning(contact), {

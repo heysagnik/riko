@@ -79,9 +79,15 @@ point is not whether they can act, it is that continuing to email someone about
 a card that was reported lost or stolen is itself the wrong move, and doing so
 is worse than an unnecessary escalation. Do not reason "this is customer-
 actionable, so contact is fine" for these - actionable and safe are different
-questions, and this failure mode fails the second one. A plain decline for
-insufficient funds, an expired card, or a wrong CVV/OTP is not this case and
-should be handled normally.
+questions, and this failure mode fails the second one.
+
+Be precise about what a compromise signal is. An expired card, an invalid CVV,
+a wrong OTP or failed authentication, insufficient funds, a soft decline with a
+stated reason, or a gateway/network error are routine billing problems - none
+of them means the instrument was compromised, and choosing "stop" for them is
+a serious mistake: the code after you only hard-stops genuinely flagged codes,
+so your reasoning is the only thing protecting the recovery here. When the
+code/description names one of those ordinary reasons, choose "contact".
 
 If and only if you choose "contact", pick the rung (tone) the email should use:
 - instrument_fix: the card/UPI/bank instrument failed for something the customer can fix (expired card, wrong OTP, insufficient funds). Friendly, no blame.
@@ -194,6 +200,8 @@ function buildPrompt(input: ReasonPaymentCaseInput): string {
   ].join("\n");
 }
 
+const FRAUD_TEXT = /fraud|stolen|lost card|compromis|unauthori[sz]ed|pickup|restricted/i;
+
 function applyDeterministicOverrides(
   result: ReasonPaymentCaseResult,
   input: ReasonPaymentCaseInput,
@@ -204,6 +212,20 @@ function applyDeterministicOverrides(
       confidence: 1,
       rationale: `Deterministic override: failure code "${input.failureCode}" is a known compromised-instrument/fraud signal. Model had proposed "${result.decision}": ${result.rationale}`,
       rung: null,
+      waitHours: null,
+    };
+  }
+
+  if (
+    result.decision === "stop" &&
+    !isFraudSignal(input.failureCode) &&
+    !FRAUD_TEXT.test(`${input.failureCode ?? ""} ${input.failureDescription ?? ""}`)
+  ) {
+    return {
+      decision: "contact",
+      confidence: result.confidence,
+      rationale: `Deterministic override: "${input.failureCode}" is a routine billing failure, not a compromise signal - the model's stop was overcautious. Model rationale: ${result.rationale}`,
+      rung: "instrument_fix",
       waitHours: null,
     };
   }
