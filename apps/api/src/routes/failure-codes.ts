@@ -13,6 +13,9 @@ failureCodesRouter.get("/failure-codes/unmapped", requireTenant, async (req, res
       .select({
         providerId: connections.providerId,
         failureCode: payments.failureCode,
+        failureCategory: payments.failureCategory,
+        failureRecoverable: payments.failureRecoverable,
+        mapped: sql<boolean>`${failureCodeMap.providerCode} is not null`,
         occurrences: sql<number>`count(*)::int`,
         amountMinor: sql<number>`coalesce(sum(${payments.amountMinor}), 0)::int`,
         lastSeen: sql<Date>`max(${payments.occurredAt})`,
@@ -26,16 +29,16 @@ failureCodesRouter.get("/failure-codes/unmapped", requireTenant, async (req, res
           sql`${failureCodeMap.providerCode}::text = ${payments.failureCode}::text`,
         ),
       )
-      .where(
-        and(
-          eq(payments.tenantId, tenantId),
-          isNotNull(payments.failureCode),
-          sql`${failureCodeMap.providerCode} is null`,
-        ),
+      .where(and(eq(payments.tenantId, tenantId), isNotNull(payments.failureCode)))
+      .groupBy(
+        connections.providerId,
+        payments.failureCode,
+        payments.failureCategory,
+        payments.failureRecoverable,
+        failureCodeMap.providerCode,
       )
-      .groupBy(connections.providerId, payments.failureCode)
       .orderBy(sql`count(*) desc`)
-      .limit(50),
+      .limit(200),
   );
 
   res.json({ unmapped: rows });

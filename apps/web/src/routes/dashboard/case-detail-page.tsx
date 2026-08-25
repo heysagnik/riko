@@ -246,6 +246,17 @@ function AgentWork({
   const finalDraft = [...drafts].reverse().find((e) => e.kind === "action" && isEmailDraft(e.item.output));
   const finalOutput = finalDraft && finalDraft.kind === "action" ? (finalDraft.item.output as EmailDraftOutput) : null;
 
+  const draftNumbers = new Map<string, number>();
+  {
+    let n = 0;
+    for (const entry of entries) {
+      if (entry.kind === "action" && entry.item.tool === "draft_email") {
+        n += 1;
+        draftNumbers.set(entry.item.id, n);
+      }
+    }
+  }
+
   if (!finalOutput && entries.length === 0) return null;
 
   return (
@@ -271,11 +282,11 @@ function AgentWork({
         </>
       ) : null}
 
-      <div className="border-t border-line/70 bg-surface-sunk/50 px-4 py-2">
+      <div className="border-t border-line/70 bg-surface-sunk/50 px-4 py-2.5">
         <button
           type="button"
           onClick={() => setOpenChecks((v) => !v)}
-          className="flex w-full items-center justify-between gap-2 text-left text-caption text-ink-muted transition-colors hover:text-ink"
+          className="flex w-full select-none items-center justify-between gap-2 text-left text-caption text-ink-muted transition-colors hover:text-ink"
         >
           <span className="inline-flex items-center gap-1.5 font-medium">
             <CaretDownIcon
@@ -289,70 +300,82 @@ function AgentWork({
         </button>
 
         {openChecks ? (
-          <ol className="mt-2.5 space-y-2 border-t border-line/60 pt-2.5 animate-in fade-in-0 slide-in-from-top-1 duration-150 ease-out">
+          <ol className="mt-3 space-y-2.5 border-t border-line/60 pt-3 animate-in fade-in-0 slide-in-from-top-1 duration-150 ease-out">
             {entries.map((entry) => {
               if (entry.kind !== "action") return null;
               const { item } = entry;
 
               if (item.tool === "validate_draft" && isValidation(item.output)) {
                 return (
-                  <li key={item.id} className="text-caption">
-                    {item.output.valid ? (
-                      <span className="inline-flex items-center gap-2">
-                        <Badge variant="recovered">Checks passed</Badge>
-                        {typeof item.output.score === "number" ? (
-                          <span className="tabular-nums text-ink-muted">
-                            quality {item.output.score}/100
-                          </span>
-                        ) : null}
-                      </span>
-                    ) : (
-                      <div className="space-y-1">
-                        <Badge variant="lost">Rejected</Badge>
-                        <ul className="space-y-0.5 pl-1">
+                  <li key={item.id} className="flex items-start gap-2.5 text-caption">
+                    <Badge
+                      variant={item.output.valid ? "recovered" : "lost"}
+                      className="mt-px min-w-32 shrink-0 justify-center whitespace-nowrap"
+                    >
+                      {item.output.valid ? "Checks passed" : "Rejected"}
+                    </Badge>
+                    <div className="min-w-0 flex-1">
+                      {item.output.valid ? (
+                        typeof item.output.score === "number" ? (
+                          <span className="tabular-nums text-ink-muted">Quality {item.output.score}/100</span>
+                        ) : null
+                      ) : (
+                        <ul className="space-y-1">
                           {item.output.failures.map((f) => (
-                            <li key={f.rule} className="text-caption text-lost">
+                            <li key={f.rule} className="leading-relaxed text-lost">
                               {f.detail}
                             </li>
                           ))}
                         </ul>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </li>
                 );
               }
 
               if (item.tool === "reason_payment_case" && item.output && typeof item.output === "object") {
                 const out = item.output as { decision?: string; rationale?: string; confidence?: number };
+                const decision =
+                  out.decision === "contact"
+                    ? "Decided to contact"
+                    : out.decision === "wait"
+                      ? "Decided to wait"
+                      : out.decision === "stop"
+                        ? "Decided to stop"
+                        : "Decided to escalate";
                 return (
-                  <li key={item.id} className="text-caption">
-                    <span className="inline-flex items-center gap-2">
-                      <Badge variant={out.decision === "contact" ? "accent" : out.decision === "wait" ? "waiting" : "lost"}>
-                        {out.decision === "contact"
-                          ? "Decided to contact"
-                          : out.decision === "wait"
-                            ? "Decided to wait"
-                            : out.decision === "stop"
-                              ? "Decided to stop"
-                              : "Decided to escalate"}
-                      </Badge>
-                      {out.rationale ? <span className="text-ink-muted">{out.rationale}</span> : null}
-                    </span>
+                  <li key={item.id} className="flex items-start gap-2.5 text-caption">
+                    <Badge
+                      variant={out.decision === "contact" ? "accent" : out.decision === "wait" ? "waiting" : "lost"}
+                      className="mt-px min-w-32 shrink-0 justify-center whitespace-nowrap"
+                    >
+                      {decision}
+                    </Badge>
+                    {out.rationale ? (
+                      <p className="min-w-0 flex-1 leading-relaxed text-ink-muted">{out.rationale}</p>
+                    ) : null}
                   </li>
                 );
               }
 
               if (item.tool === "draft_email" && isEmailDraft(item.output)) {
                 return (
-                  <li key={item.id} className="text-caption text-ink-faint">
-                    Drafted by {item.model ?? "model"} · {item.latencyMs ?? "—"}ms
+                  <li key={item.id} className="flex items-start gap-2.5 text-caption">
+                    <Badge variant="default" className="mt-px min-w-32 shrink-0 justify-center whitespace-nowrap">
+                      Draft {draftNumbers.get(item.id) ?? ""}
+                    </Badge>
+                    <p className="min-w-0 flex-1 leading-relaxed text-ink-faint">
+                      by {item.model ?? "model"} · {item.latencyMs ?? "—"}ms
+                    </p>
                   </li>
                 );
               }
 
               return (
-                <li key={item.id} className="text-caption text-ink-faint">
-                  {item.tool}
+                <li key={item.id} className="flex items-start gap-2.5 text-caption">
+                  <Badge variant="default" className="mt-px min-w-32 shrink-0 truncate">
+                    {item.tool}
+                  </Badge>
                 </li>
               );
             })}
