@@ -23,7 +23,7 @@
   "devDependencies": {
     "@types/pg": "^8.11.10",
     "drizzle-kit": "^0.31.0",
-    "vitest": "^2.1.0",
+    "vitest": "^3.2.6",
     "typescript": "^5.7.0"
   }
 }
