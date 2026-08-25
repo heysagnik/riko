@@ -1,0 +1,160 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 620" width="100%" height="100%">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&amp;family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap');
+      
+      .hand-title { font-family: 'Kalam', 'Caveat', 'Segoe Print', cursive, sans-serif; font-size: 22px; font-weight: 700; fill: #ffffff; }
+      .hand-sub { font-family: 'Kalam', 'Caveat', cursive, sans-serif; font-size: 14px; fill: #a1a1aa; }
+      .hand-col-header { font-family: 'Kalam', 'Caveat', cursive, sans-serif; font-size: 16px; font-weight: 700; fill: #ffd43b; letter-spacing: 0.02em; }
+      .box-head { font-family: 'Kalam', 'Caveat', cursive, sans-serif; font-size: 16px; font-weight: 700; fill: #ffffff; }
+      .box-text { font-family: 'Inter', -apple-system, sans-serif; font-size: 11.5px; fill: #cbd5e1; line-height: 1.4; }
+      .mono-chip { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; fill: #74c0fc; font-weight: 500; }
+      .mono-dim { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10.5px; fill: #94a3b8; }
+      
+      .ex-box { fill: #18181b; stroke: #52525b; stroke-width: 1.75px; stroke-linejoin: round; stroke-linecap: round; }
+      .ex-box-cyan { fill: #0c2135; stroke: #74c0fc; stroke-width: 1.75px; stroke-linejoin: round; }
+      .ex-box-purple { fill: #201335; stroke: #b197fc; stroke-width: 1.75px; stroke-linejoin: round; }
+      .ex-box-yellow { fill: #2a2105; stroke: #ffd43b; stroke-width: 1.75px; stroke-linejoin: round; }
+      .ex-box-green { fill: #09261a; stroke: #69db7c; stroke-width: 1.75px; stroke-linejoin: round; }
+      .ex-group { fill: #121215; stroke: #3f3f46; stroke-width: 1.5px; stroke-dasharray: 6 4; }
+      
+      .flow-line { stroke: #71717a; stroke-width: 1.75px; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+      .flow-cyan { stroke: #74c0fc; stroke-width: 1.75px; fill: none; stroke-linecap: round; }
+    </style>
+
+    <marker id="exArrow" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 1 2 L 8 5 L 1 8" fill="none" stroke="#a1a1aa" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <marker id="exArrowCyan" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 1 2 L 8 5 L 1 8" fill="none" stroke="#74c0fc" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <!-- Background Canvas -->
+  <rect width="1120" height="620" fill="#121214" rx="12"/>
+  <rect width="1116" height="616" x="2" y="2" fill="none" stroke="#27272a" stroke-width="2" rx="10"/>
+
+  <!-- Canvas Header -->
+  <text x="40" y="44" class="hand-title">Riko System Architecture</text>
+  <text x="40" y="68" class="hand-sub">Deterministic recovery engine with bounded AI drafting &amp; cryptographic audit trail</text>
+
+  <!-- ==================== COLUMN 1: INGESTION ==================== -->
+  <rect x="36" y="90" width="240" height="500" rx="10" class="ex-group"/>
+  <text x="56" y="118" class="hand-col-header">1. Event Ingestion</text>
+
+  <!-- Card 1.1: Gateways -->
+  <rect x="52" y="136" width="208" height="96" rx="8" class="ex-box"/>
+  <text x="68" y="162" class="box-head">Payment Gateways</text>
+  <text x="68" y="184" class="box-text">Razorpay &amp; Stripe webhooks</text>
+  <text x="68" y="202" class="mono-dim">payment.failed · invoice.paid</text>
+
+  <!-- Card 1.2: Cloudflare Email -->
+  <rect x="52" y="248" width="208" height="96" rx="8" class="ex-box"/>
+  <text x="68" y="274" class="box-head">Cloudflare Email</text>
+  <text x="68" y="296" class="box-text">PostalMime RFC parser</text>
+  <text x="68" y="314" class="mono-dim">billing+&lt;caseId&gt;@domain</text>
+
+  <!-- Card 1.3: Exposures Sweep -->
+  <rect x="52" y="360" width="208" height="96" rx="8" class="ex-box"/>
+  <text x="68" y="386" class="box-head">Exposures Sweep</text>
+  <text x="68" y="408" class="box-text">Cart abandonment &gt; 7d</text>
+  <text x="68" y="426" class="mono-dim">Overdue receivables &gt; 30d</text>
+
+  <!-- Card 1.4: Public Recovery -->
+  <rect x="52" y="472" width="208" height="96" rx="8" class="ex-box"/>
+  <text x="68" y="498" class="box-head">Public Endpoints</text>
+  <text x="68" y="520" class="box-text">Customer payment portal</text>
+  <text x="68" y="538" class="mono-dim">One-click unsubscribe</text>
+
+
+  <!-- ==================== COLUMN 2: CORE & DAEMON ==================== -->
+  <rect x="300" y="90" width="490" height="500" rx="10" class="ex-group"/>
+  <text x="320" y="118" class="hand-col-header" fill="#74c0fc">2. Core Platform &amp; Worker</text>
+
+  <!-- Card 2.1: Express API Gateway -->
+  <rect x="316" y="136" width="458" height="96" rx="8" class="ex-box-cyan"/>
+  <text x="334" y="162" class="box-head" fill="#74c0fc">apps/api (Express REST Gateway)</text>
+  <text x="334" y="184" class="mono-chip">/webhooks/* · /inbound/mail · /auth/* · /cases</text>
+  <text x="334" y="204" class="box-text">HMAC signature verification · Better Auth sessions · Case REST routes</text>
+
+  <!-- Card 2.2: Storage & Cryptography -->
+  <rect x="316" y="248" width="458" height="106" rx="8" class="ex-box-green"/>
+  <text x="334" y="274" class="box-head" fill="#69db7c">PostgreSQL (Neon) + packages/db</text>
+  <text x="334" y="296" class="box-text">• Drizzle ORM schema &amp; withTenant multi-tenant row isolation</text>
+  <text x="334" y="316" class="box-text">• AES-256-GCM vault (customer email &amp; phone encrypted at rest)</text>
+  <text x="334" y="336" class="box-text">• Cryptographic SHA-256 tamper-evident event hash chain</text>
+
+  <!-- Card 2.3: Autonomous Daemon Loop -->
+  <rect x="316" y="370" width="458" height="198" rx="8" class="ex-box-purple"/>
+  <text x="334" y="396" class="box-head" fill="#b197fc">Autonomous Recovery Daemon (apps/worker)</text>
+  <text x="334" y="416" class="box-text">Polled every 15s via pg_try_advisory_lock('riko-worker-tick')</text>
+
+  <!-- Sub-box 1: Gates -->
+  <rect x="330" y="430" width="134" height="124" rx="6" class="ex-box"/>
+  <text x="342" y="454" class="box-head" font-size="14" fill="#ffd43b">1. Send Gates</text>
+  <text x="342" y="474" class="box-text">• 10 Safety gates</text>
+  <text x="342" y="492" class="box-text">• 48h Cooldown</text>
+  <text x="342" y="510" class="box-text">• Quiet hours 7–23</text>
+  <text x="342" y="528" class="box-text">• Fraud code stop</text>
+
+  <!-- Sub-box 2: Drafter -->
+  <rect x="478" y="430" width="148" height="124" rx="6" class="ex-box-yellow"/>
+  <text x="490" y="454" class="box-head" font-size="14" fill="#ffd43b">2. AI Drafter</text>
+  <text x="490" y="474" class="box-text">• Llama 3.1 8B (NIM)</text>
+  <text x="490" y="492" class="box-text">• 6-Rule AST validator</text>
+  <text x="490" y="510" class="box-text">• Zero discounts</text>
+  <text x="490" y="528" class="box-text">• 3x Retry loop</text>
+
+  <!-- Sub-box 3: Dispatch & 2-Way -->
+  <rect x="640" y="430" width="120" height="124" rx="6" class="ex-box"/>
+  <text x="652" y="454" class="box-head" font-size="14" fill="#69db7c">3. SMTP &amp; 2-Way</text>
+  <text x="652" y="474" class="box-text">• Verified SMTP</text>
+  <text x="652" y="492" class="box-text">• List-Unsubscribe</text>
+  <text x="652" y="510" class="box-text">• NLP Promise log</text>
+  <text x="652" y="528" class="box-text">• Multi-turn reply</text>
+
+
+  <!-- ==================== COLUMN 3: OPERATIONS UI ==================== -->
+  <rect x="814" y="90" width="270" height="500" rx="10" class="ex-group"/>
+  <text x="834" y="118" class="hand-col-header" fill="#69db7c">3. Merchant Operations</text>
+
+  <!-- Card 3.1: Live Inspector -->
+  <rect x="830" y="136" width="238" height="96" rx="8" class="ex-box"/>
+  <text x="846" y="162" class="box-head">Live Case Inspector</text>
+  <text x="846" y="184" class="box-text">Real-time state timeline</text>
+  <text x="846" y="202" class="box-text">Full email trail &amp; audit events</text>
+
+  <!-- Card 3.2: Holdout Analytics -->
+  <rect x="830" y="248" width="238" height="96" rx="8" class="ex-box-green"/>
+  <text x="846" y="274" class="box-head" fill="#69db7c">Holdout Attribution</text>
+  <text x="846" y="296" class="box-text">Treatment vs Control group</text>
+  <text x="846" y="316" class="mono-chip">Lift = Treat% - Holdout%</text>
+
+  <!-- Card 3.3: Escalations Queue -->
+  <rect x="830" y="360" width="238" height="96" rx="8" class="ex-box"/>
+  <text x="846" y="386" class="box-head">Escalations Queue</text>
+  <text x="846" y="408" class="box-text">Operator approval for high value</text>
+  <text x="846" y="426" class="box-text">Dispute &amp; 3x failure triage</text>
+
+  <!-- Card 3.4: Audit Verifier -->
+  <rect x="830" y="472" width="238" height="96" rx="8" class="ex-box"/>
+  <text x="846" y="498" class="box-head">Audit Verifier</text>
+  <text x="846" y="520" class="box-text">Traverses SHA-256 chain</text>
+  <text x="846" y="538" class="box-text">Detects any database tampering</text>
+
+
+  <!-- ==================== FLOW CONNECTIONS ==================== -->
+  <!-- Col 1 to Col 2 -->
+  <line x1="260" y1="184" x2="316" y2="184" class="flow-line" marker-end="url(#exArrow)"/>
+  <line x1="260" y1="296" x2="316" y2="198" class="flow-line" marker-end="url(#exArrow)"/>
+
+  <!-- Col 2: API to DB -->
+  <line x1="545" y1="232" x2="545" y2="248" class="flow-line" marker-end="url(#exArrow)"/>
+
+  <!-- Col 2: DB to Worker -->
+  <line x1="545" y1="354" x2="545" y2="370" class="flow-cyan" marker-end="url(#exArrowCyan)"/>
+
+  <!-- Col 2 to Col 3 (API/DB to Dashboard) -->
+  <line x1="774" y1="184" x2="830" y2="184" class="flow-line" marker-end="url(#exArrow)"/>
+  <line x1="774" y1="296" x2="830" y2="296" class="flow-line" marker-end="url(#exArrow)"/>
+</svg>

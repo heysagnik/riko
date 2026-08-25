@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 440" width="100%" height="100%">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&amp;family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap');
+      
+      .hand-title { font-family: 'Kalam', 'Caveat', cursive, sans-serif; font-size: 22px; font-weight: 700; fill: #ffffff; }
+      .hand-sub { font-family: 'Kalam', 'Caveat', cursive, sans-serif; font-size: 14px; fill: #a1a1aa; }
+      .section-tag { font-family: 'Kalam', 'Caveat', cursive, sans-serif; font-size: 15px; font-weight: 700; fill: #ffd43b; }
+      .box-head { font-family: 'Kalam', 'Caveat', cursive, sans-serif; font-size: 16px; font-weight: 700; fill: #ffffff; }
+      .box-text { font-family: 'Inter', -apple-system, sans-serif; font-size: 11.5px; fill: #cbd5e1; line-height: 1.4; }
+      .mono-chip { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; fill: #74c0fc; font-weight: 500; }
+      .state-head { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 14px; font-weight: 700; }
+
+      .ex-box { fill: #18181b; stroke: #52525b; stroke-width: 1.75px; stroke-linejoin: round; }
+      .ex-box-cyan { fill: #0c2135; stroke: #74c0fc; stroke-width: 1.75px; stroke-linejoin: round; }
+      .ex-box-green { fill: #09261a; stroke: #69db7c; stroke-width: 1.75px; stroke-linejoin: round; }
+      .ex-box-amber { fill: #2a2105; stroke: #ffd43b; stroke-width: 1.75px; stroke-linejoin: round; }
+      .ex-box-red { fill: #2d1215; stroke: #ff8787; stroke-width: 1.75px; stroke-linejoin: round; }
+      
+      .flow-line { stroke: #71717a; stroke-width: 1.75px; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+      .flow-cyan { stroke: #74c0fc; stroke-width: 1.75px; fill: none; stroke-linecap: round; }
+    </style>
+
+    <marker id="exArr" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 1 2 L 8 5 L 1 8" fill="none" stroke="#a1a1aa" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <marker id="exArrCyan" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 1 2 L 8 5 L 1 8" fill="none" stroke="#74c0fc" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <!-- Background Canvas -->
+  <rect width="1040" height="440" fill="#121214" rx="12"/>
+  <rect width="1036" height="436" x="2" y="2" fill="none" stroke="#27272a" stroke-width="2" rx="10"/>
+
+  <!-- Header -->
+  <text x="40" y="44" class="hand-title">Recovery Lifecycle Pipeline</text>
+  <text x="40" y="68" class="hand-sub">Sequential stages from failure ingestion to bounded dispatch and settlement tracking</text>
+
+  <!-- ==================== TOP ROW: 6 PIPELINE STAGES ==================== -->
+  
+  <!-- Stage 1: Ingest -->
+  <rect x="40" y="94" width="140" height="128" rx="8" class="ex-box"/>
+  <text x="54" y="122" class="box-head">1. Ingestion</text>
+  <text x="54" y="146" class="box-text">• Webhook HMAC</text>
+  <text x="54" y="166" class="box-text">• AES-256 Vault</text>
+  <text x="54" y="186" class="box-text">• 5% Control Arm</text>
+
+  <!-- Stage 2: Send Gates -->
+  <rect x="204" y="94" width="140" height="128" rx="8" class="ex-box"/>
+  <text x="218" y="122" class="box-head">2. Send Gates</text>
+  <text x="218" y="146" class="box-text">• Max 3 attempts</text>
+  <text x="218" y="166" class="box-text">• 48h Cooldown</text>
+  <text x="218" y="186" class="box-text">• Quiet hours 7–23</text>
+
+  <!-- Stage 3: Policy Router -->
+  <rect x="368" y="94" width="140" height="128" rx="8" class="ex-box"/>
+  <text x="382" y="122" class="box-head">3. Policy Router</text>
+  <text x="382" y="146" class="box-text">• Fraud code filter</text>
+  <text x="382" y="166" class="box-text">• Value threshold</text>
+  <text x="382" y="186" class="box-text">• Tone rung select</text>
+
+  <!-- Stage 4: AI Drafter & Validator (Accent) -->
+  <rect x="532" y="94" width="154" height="128" rx="8" class="ex-box-cyan"/>
+  <text x="546" y="122" class="box-head" fill="#74c0fc">4. AI Drafter</text>
+  <text x="546" y="146" class="box-text">• Llama 3.1 8B (NIM)</text>
+  <text x="546" y="166" class="box-text">• 6-rule AST verify</text>
+  <text x="546" y="186" class="box-text">• 3x Error retry loop</text>
+
+  <!-- Stage 5: SMTP Dispatch -->
+  <rect x="710" y="94" width="130" height="128" rx="8" class="ex-box"/>
+  <text x="724" y="122" class="box-head">5. Dispatch</text>
+  <text x="724" y="146" class="box-text">• Verified SMTP</text>
+  <text x="724" y="166" class="box-text">• List-Unsubscribe</text>
+  <text x="724" y="186" class="box-text">• SHA-256 Ledger</text>
+
+  <!-- Stage 6: Threading & Promises -->
+  <rect x="864" y="94" width="136" height="128" rx="8" class="ex-box"/>
+  <text x="878" y="122" class="box-head">6. Threading</text>
+  <text x="878" y="146" class="box-text">• Inbound MX</text>
+  <text x="878" y="166" class="box-text">• NLP Promise log</text>
+  <text x="878" y="186" class="box-text">• Contextual reply</text>
+
+  <!-- Pipeline Connecting Arrows -->
+  <line x1="180" y1="158" x2="204" y2="158" class="flow-line" marker-end="url(#exArr)"/>
+  <line x1="344" y1="158" x2="368" y2="158" class="flow-line" marker-end="url(#exArr)"/>
+  <line x1="508" y1="158" x2="532" y2="158" class="flow-cyan" marker-end="url(#exArrCyan)"/>
+  <line x1="686" y1="158" x2="710" y2="158" class="flow-line" marker-end="url(#exArr)"/>
+  <line x1="840" y1="158" x2="864" y2="158" class="flow-line" marker-end="url(#exArr)"/>
+
+
+  <!-- ==================== BOTTOM ROW: RESOLUTION STATES ==================== -->
+  <text x="40" y="262" class="section-tag">Terminal Resolution States</text>
+
+  <!-- Card: RECOVERED -->
+  <rect x="40" y="282" width="220" height="114" rx="8" class="ex-box-green"/>
+  <text x="56" y="312" class="state-head" fill="#69db7c">RECOVERED</text>
+  <text x="56" y="338" class="box-text">Payment captured in gateway</text>
+  <text x="56" y="360" class="mono-chip">Attributed ROI counted</text>
+
+  <!-- Card: SKIPPED -->
+  <rect x="286" y="282" width="220" height="114" rx="8" class="ex-box"/>
+  <text x="302" y="312" class="state-head" fill="#a1a1aa">SKIPPED</text>
+  <text x="302" y="338" class="box-text">Holdout control arm</text>
+  <text x="302" y="360" class="box-text">Fraud code / Hard bounce / Unsub</text>
+
+  <!-- Card: ESCALATED -->
+  <rect x="532" y="282" width="220" height="114" rx="8" class="ex-box-amber"/>
+  <text x="548" y="312" class="state-head" fill="#ffd43b">ESCALATED</text>
+  <text x="548" y="338" class="box-text">Amount &gt; human threshold</text>
+  <text x="548" y="360" class="box-text">3x Validation fail / Dispute</text>
+
+  <!-- Card: LOST -->
+  <rect x="778" y="282" width="222" height="114" rx="8" class="ex-box-red"/>
+  <text x="794" y="312" class="state-head" fill="#ff8787">LOST</text>
+  <text x="794" y="338" class="box-text">3 Outreach attempts exhausted</text>
+  <text x="794" y="360" class="box-text">Zero settlement received</text>
+</svg>

@@ -1,0 +1,152 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 580" width="100%" height="100%">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&amp;family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap');
+      
+      .hand-title { font-family: 'Kalam', 'Caveat', cursive, sans-serif; font-size: 22px; font-weight: 700; fill: #ffffff; }
+      .hand-sub { font-family: 'Kalam', 'Caveat', cursive, sans-serif; font-size: 14px; fill: #a1a1aa; }
+      .state-head { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 14px; font-weight: 700; fill: #74c0fc; }
+      .state-sub { font-family: 'Inter', -apple-system, sans-serif; font-size: 11.5px; fill: #cbd5e1; }
+      .lbl { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; font-weight: 500; fill: #94a3b8; }
+      .lbl-cyan { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; font-weight: 500; fill: #74c0fc; }
+      .lbl-green { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; font-weight: 500; fill: #69db7c; }
+      .lbl-amber { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; font-weight: 500; fill: #ffd43b; }
+      .lbl-red { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; font-weight: 500; fill: #ff8787; }
+
+      .ex-box { fill: #18181b; stroke: #52525b; stroke-width: 1.75px; stroke-linejoin: round; }
+      .ex-box-cyan { fill: #0c2135; stroke: #74c0fc; stroke-width: 1.75px; stroke-linejoin: round; }
+      .ex-box-green { fill: #09261a; stroke: #69db7c; stroke-width: 2px; stroke-linejoin: round; }
+      .ex-box-amber { fill: #2a2105; stroke: #ffd43b; stroke-width: 1.75px; stroke-linejoin: round; }
+      .ex-box-red { fill: #2d1215; stroke: #ff8787; stroke-width: 1.75px; stroke-linejoin: round; }
+      
+      .flow-line { stroke: #71717a; stroke-width: 1.75px; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+      .flow-cyan { stroke: #74c0fc; stroke-width: 1.75px; fill: none; stroke-linecap: round; }
+      .flow-green { stroke: #69db7c; stroke-width: 2px; fill: none; stroke-linecap: round; }
+      .flow-amber { stroke: #ffd43b; stroke-width: 1.75px; fill: none; stroke-linecap: round; }
+      .flow-red { stroke: #ff8787; stroke-width: 1.75px; fill: none; stroke-linecap: round; }
+    </style>
+
+    <marker id="exArr" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 1 2 L 8 5 L 1 8" fill="none" stroke="#71717a" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <marker id="exArrCyan" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 1 2 L 8 5 L 1 8" fill="none" stroke="#74c0fc" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <marker id="exArrGreen" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 1 2 L 8 5 L 1 8" fill="none" stroke="#69db7c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <marker id="exArrAmber" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 1 2 L 8 5 L 1 8" fill="none" stroke="#ffd43b" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <marker id="exArrRed" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 1 2 L 8 5 L 1 8" fill="none" stroke="#ff8787" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <!-- Background Canvas -->
+  <rect width="1080" height="580" fill="#121214" rx="12"/>
+  <rect width="1076" height="576" x="2" y="2" fill="none" stroke="#27272a" stroke-width="2" rx="10"/>
+
+  <!-- Header -->
+  <text x="44" y="46" class="hand-title">Deterministic Case State Machine</text>
+  <text x="44" y="70" class="hand-sub">Finite state transitions enforced by packages/core/src/cases/state-machine.ts</text>
+
+  <!-- ==================== TOP ROW: PROMISED ==================== -->
+  <rect x="700" y="90" width="150" height="84" rx="8" class="ex-box-cyan"/>
+  <text x="718" y="122" class="state-head">PROMISED</text>
+  <text x="718" y="146" class="state-sub">Outreach paused</text>
+
+
+  <!-- ==================== MAIN ROW STATES ==================== -->
+  
+  <!-- State: NEW -->
+  <rect x="44" y="235" width="134" height="84" rx="8" class="ex-box-cyan"/>
+  <text x="62" y="267" class="state-head">NEW</text>
+  <text x="62" y="291" class="state-sub">Case opened</text>
+
+  <!-- State: DRAFTING -->
+  <rect x="262" y="235" width="144" height="84" rx="8" class="ex-box-cyan"/>
+  <text x="280" y="267" class="state-head">DRAFTING</text>
+  <text x="280" y="291" class="state-sub">AI draft &amp; validate</text>
+
+  <!-- State: SENDING -->
+  <rect x="490" y="235" width="144" height="84" rx="8" class="ex-box-cyan"/>
+  <text x="508" y="267" class="state-head">SENDING</text>
+  <text x="508" y="291" class="state-sub">SMTP claimed</text>
+
+  <!-- State: WAITING -->
+  <rect x="700" y="235" width="150" height="84" rx="8" class="ex-box-amber"/>
+  <text x="718" y="267" class="state-head" fill="#ffd43b">WAITING</text>
+  <text x="718" y="291" class="state-sub">48h cooldown</text>
+
+  <!-- State: RECOVERED -->
+  <rect x="910" y="235" width="126" height="84" rx="8" class="ex-box-green"/>
+  <text x="926" y="267" class="state-head" fill="#69db7c">RECOVERED</text>
+  <text x="926" y="291" class="state-sub">Paid &amp; settled</text>
+
+
+  <!-- ==================== BOTTOM ROW TERMINAL STATES ==================== -->
+  
+  <!-- State: SKIPPED -->
+  <rect x="262" y="445" width="144" height="84" rx="8" class="ex-box"/>
+  <text x="280" y="477" class="state-head" fill="#a1a1aa">SKIPPED</text>
+  <text x="280" y="501" class="state-sub">Holdout / Fraud / Unsub</text>
+
+  <!-- State: ESCALATED -->
+  <rect x="490" y="445" width="144" height="84" rx="8" class="ex-box-amber"/>
+  <text x="508" y="477" class="state-head" fill="#ffd43b">ESCALATED</text>
+  <text x="508" y="501" class="state-sub">Human review queue</text>
+
+  <!-- State: LOST -->
+  <rect x="700" y="445" width="150" height="84" rx="8" class="ex-box-red"/>
+  <text x="718" y="477" class="state-head" fill="#ff8787">LOST</text>
+  <text x="718" y="501" class="state-sub">3 attempts exhausted</text>
+
+
+  <!-- ==================== TRANSITION ARROWS & LABELS ==================== -->
+  
+  <!-- NEW -> DRAFTING -->
+  <line x1="178" y1="277" x2="262" y2="277" class="flow-cyan" marker-end="url(#exArrCyan)"/>
+  <text x="220" y="267" text-anchor="middle" class="lbl-cyan">gates_passed</text>
+
+  <!-- NEW -> SKIPPED -->
+  <path d="M 111 319 L 111 487 L 262 487" class="flow-line" marker-end="url(#exArr)"/>
+  <text x="121" y="405" class="lbl">gates_failed / fraud</text>
+
+  <!-- DRAFTING -> SENDING -->
+  <line x1="406" y1="277" x2="490" y2="277" class="flow-cyan" marker-end="url(#exArrCyan)"/>
+  <text x="448" y="267" text-anchor="middle" class="lbl-cyan">draft_valid</text>
+
+  <!-- DRAFTING -> ESCALATED -->
+  <path d="M 334 319 L 334 380 L 490 460" class="flow-amber" marker-end="url(#exArrAmber)"/>
+  <text x="344" y="375" class="lbl">draft_invalid_3x</text>
+
+  <!-- SENDING -> WAITING -->
+  <line x1="634" y1="277" x2="700" y2="277" class="flow-cyan" marker-end="url(#exArrCyan)"/>
+  <text x="667" y="267" text-anchor="middle" class="lbl-cyan">sent</text>
+
+  <!-- WAITING <-> PROMISED (SEPARATED CLEARLY) -->
+  <!-- Up Arrow: WAITING -> PROMISED -->
+  <line x1="735" y1="235" x2="735" y2="174" class="flow-cyan" marker-end="url(#exArrCyan)"/>
+  <text x="725" y="205" text-anchor="end" class="lbl-cyan">promise_captured</text>
+
+  <!-- Down Arrow: PROMISED -> WAITING -->
+  <line x1="815" y1="174" x2="815" y2="235" class="flow-amber" marker-end="url(#exArrAmber)"/>
+  <text x="825" y="205" text-anchor="start" class="lbl-amber">promise_broken</text>
+
+  <!-- WAITING -> DRAFTING (Retry loop underneath) -->
+  <path d="M 730 319 L 730 355 L 360 355 L 360 319" class="flow-line" marker-end="url(#exArr)"/>
+  <text x="545" y="347" text-anchor="middle" class="lbl">cooldown_elapsed_retry (48h gap)</text>
+
+  <!-- WAITING -> LOST -->
+  <line x1="775" y1="319" x2="775" y2="445" class="flow-red" marker-end="url(#exArrRed)"/>
+  <text x="785" y="390" class="lbl-red">attempts_exhausted</text>
+
+  <!-- WAITING -> RECOVERED -->
+  <line x1="850" y1="277" x2="910" y2="277" class="flow-green" marker-end="url(#exArrGreen)"/>
+  <text x="880" y="267" text-anchor="middle" class="lbl-green">paid</text>
+
+  <!-- PROMISED -> RECOVERED -->
+  <path d="M 850 132 L 973 132 L 973 235" class="flow-green" marker-end="url(#exArrGreen)"/>
+  <text x="910" y="122" text-anchor="middle" class="lbl-green">promise_kept</text>
+</svg>
