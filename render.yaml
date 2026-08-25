@@ -5,7 +5,7 @@ services:
     plan: free
     region: singapore
     branch: master
-    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @riko/web build && pnpm --filter @riko/db exec tsx src/migrate.ts
+    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @riko/web build && pnpm --filter @riko/db exec tsx src/migrate.ts
     startCommand: pnpm --filter @riko/api run start:prod
     healthCheckPath: /health
     envVars:

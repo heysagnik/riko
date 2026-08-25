@@ -11,19 +11,19 @@
     "start:prod": "tsx src/index.ts"
   },
   "dependencies": {
-    "@ai-sdk/openai-compatible": "^3",
+    "@ai-sdk/openai-compatible": "^3.0.37",
     "@riko/agent": "workspace:*",
     "@riko/core": "workspace:*",
     "@riko/db": "workspace:*",
     "@riko/shared": "workspace:*",
     "drizzle-orm": "^0.45.2",
-    "nodemailer": "^6.9.16",
-    "tsx": "^4.19.0"
+    "nodemailer": "^9.0.5",
+    "tsx": "^4.23.12"
   },
   "devDependencies": {
-    "@types/node": "^22.10.0",
-    "@types/nodemailer": "^6.4.17",
-    "typescript": "^5.7.0"
+    "@types/node": "^26.3.0",
+    "@types/nodemailer": "^8.0.1",
+    "typescript": "^5.9.3"
   },
   "exports": {
     ".": "./src/index.ts",

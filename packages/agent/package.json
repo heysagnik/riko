@@ -14,16 +14,17 @@
     "bench": "tsx --env-file=../../.env scripts/bench-reply.ts"
   },
   "dependencies": {
-    "@ai-sdk/openai-compatible": "^3",
+    "@ai-sdk/openai-compatible": "^3.0.37",
     "@riko/core": "workspace:*",
     "@riko/shared": "workspace:*",
-    "ai": "^7",
-    "zod": "^4"
+    "ai": "^7.0.79",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@ai-sdk/provider": "^4",
-    "typescript": "^5.7.0",
-    "vitest": "^2.1.0",
-    "tsx": "^4.19.0"
+    "@types/node": "^26.3.0",
+    "@ai-sdk/provider": "^4.0.8",
+    "tsx": "^4.23.12",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.11"
   }
 }

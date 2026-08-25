@@ -53,7 +53,8 @@ connectionsRouter.post("/connections/razorpay", requireTenant, async (req, res) 
 
 connectionsRouter.get("/connections/:connectionId/webhook-secret", requireTenant, async (req, res) => {
   const tenantId = req.tenant!.tenantId;
-  const connectionId = req.params.connectionId;
+  const rawConnectionId = req.params.connectionId;
+  const connectionId = Array.isArray(rawConnectionId) ? rawConnectionId[0] : rawConnectionId;
   if (!connectionId) {
     res.status(400).json({ error: "Missing connectionId" });
     return;
@@ -78,7 +79,8 @@ connectionsRouter.get("/connections/:connectionId/webhook-secret", requireTenant
 
 connectionsRouter.delete("/connections/:connectionId", requireTenant, async (req, res) => {
   const tenantId = req.tenant!.tenantId;
-  const connectionId = req.params.connectionId;
+  const rawConnectionId = req.params.connectionId;
+  const connectionId = Array.isArray(rawConnectionId) ? rawConnectionId[0] : rawConnectionId;
   if (!connectionId) {
     res.status(400).json({ error: "Missing connectionId" });
     return;

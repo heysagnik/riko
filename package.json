@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.1",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.0.0 <25.0.0"
   },
   "packageManager": "pnpm@9.15.1",
   "scripts": {
@@ -17,7 +17,8 @@
     "db:migrate": "pnpm --filter @riko/db run db:migrate"
   },
   "devDependencies": {
-    "typescript": "^5.7.0",
-    "@cloudflare/workers-types": "^4.20250109.0"
+    "@types/node": "^26.3.0",
+    "@cloudflare/workers-types": "^5.20260825.1",
+    "typescript": "^5.9.3"
   }
 }
