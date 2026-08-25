@@ -10,7 +10,6 @@ export interface ReplyValidationResult {
 
 export const REPLY_WORD_MAX = 120;
 
-// Concessions the agent has no authority to make, and threats it must never issue.
 const FORBIDDEN_PHRASES: { rule: string; patterns: RegExp[] }[] = [
   {
     rule: "no_concession",
@@ -46,15 +45,10 @@ function wordCount(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
-// Trailing sentence punctuation is not part of the URL; without stripping it a
-// correctly written "... pay at https://x/y." fails the allowlist.
 function extractUrls(text: string): string[] {
   return (text.match(/https?:\/\/[^\s"'<>]+/g) ?? []).map((url) => url.replace(/[.,;:!?)\]]+$/, ""));
 }
 
-// Scoped to currency-marked figures (INR/Rs/₹ next to a number) rather than
-// every digit in the reply, so a promised payment date ("by 15 August") never
-// trips this - only a figure presented as money can be a hallucinated amount.
 const CURRENCY_AMOUNT = /(?:inr|rs\.?|₹)\s*([\d,]+(?:\.\d+)?)|([\d,]+(?:\.\d+)?)\s*(?:inr|rupees)/gi;
 
 function extractCurrencyAmounts(text: string): string[] {

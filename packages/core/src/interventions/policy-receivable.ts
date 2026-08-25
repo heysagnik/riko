@@ -4,12 +4,9 @@ export type ReceivableRung = "reminder" | "firm" | "formal";
 
 interface Rung {
   id: ReceivableRung;
-  /** Days past the due date at which this rung becomes the right tone. */
   fromDaysOverdue: number;
 }
 
-// Escalation is earned by time, not impatience. The validator enforces each
-// rung's tone, so the agent cannot skip ahead to a formal notice.
 export const RECEIVABLE_RUNGS: Rung[] = [
   { id: "reminder", fromDaysOverdue: 1 },
   { id: "firm", fromDaysOverdue: 7 },

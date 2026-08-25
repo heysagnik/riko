@@ -80,7 +80,6 @@ export async function processSendingCases(
           .set({ sentAt: new Date(), providerMessageId: info.messageId })
           .where(eq(outreach.id, pending.outreachId));
 
-        // Guard, or a payment landing mid-send gets overwritten back to WAITING.
         const claimed = await tx
           .update(cases)
           .set({

@@ -26,13 +26,11 @@ export const cases = pgTable(
   customerId: uuid("customer_id").notNull().references(() => customers.id, { onDelete: "cascade" }),
   state: caseStateEnum("state").notNull().default("NEW"),
   attemptCount: integer("attempt_count").notNull().default(0),
-  // Separate from attemptCount so a chatty customer cannot loop forever.
   agentReplyCount: integer("agent_reply_count").notNull().default(0),
   awaitingAgentReply: boolean("awaiting_agent_reply").notNull().default(false),
   nextActionAt: timestamp("next_action_at", { withTimezone: true }),
   intervention: text("intervention"),
   interventionReason: text("intervention_reason"),
-  // Tone the policy engine authorised for this attempt; the validator enforces it.
   rung: text("rung"),
   arm: text("arm").notNull().default("treatment"),
   humanReviewedAt: timestamp("human_reviewed_at", { withTimezone: true }),
@@ -51,7 +49,6 @@ export const caseEvents = pgTable(
   "case_events",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    // createdAt ties on fast transitions; a chain needs one unambiguous predecessor.
     seq: bigserial("seq", { mode: "number" }).notNull(),
     tenantId: text("tenant_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
     caseId: uuid("case_id").notNull().references(() => cases.id, { onDelete: "cascade" }),

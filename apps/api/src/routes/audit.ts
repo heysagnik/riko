@@ -16,7 +16,6 @@ function toCsv(header: string[], rows: unknown[][]): string {
   return [header.join(","), ...rows.map((row) => row.map(csvCell).join(","))].join("\n");
 }
 
-/** Full replayable history for one case, with its hash chain verified. */
 auditRouter.get("/cases/:caseId/audit", requireTenant, async (req, res) => {
   const params = caseIdParamSchema.parse(req.params);
   const tenantId = req.tenant!.tenantId;
@@ -81,7 +80,6 @@ auditRouter.get("/cases/:caseId/audit", requireTenant, async (req, res) => {
   });
 });
 
-/** One row per transition across every case, for offline review. */
 auditRouter.get("/audit/export.csv", requireTenant, async (req, res) => {
   const tenantId = req.tenant!.tenantId;
 

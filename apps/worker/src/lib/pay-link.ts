@@ -5,17 +5,18 @@ import { createRazorpayPaymentLink, decryptSecret } from "@riko/core";
 const LINK_TTL_MS = 30 * 60 * 1000;
 const cache = new Map<string, { url: string; expires: number }>();
 
+export function getCachedPayLink(caseId: string): string | null {
+  const cached = cache.get(caseId);
+  if (cached && cached.expires > Date.now()) return cached.url;
+  return null;
+}
+
 function encryptionKey(): string {
   const key = process.env.APP_ENCRYPTION_KEY;
   if (!key) throw new Error("Missing required environment variable: APP_ENCRYPTION_KEY");
   return key;
 }
 
-/**
- * Creates (or reuses) a Razorpay-hosted link for a case, so the email can point
- * straight at the provider's checkout page instead of bouncing through us.
- * Failures return null and the caller falls back to our own lazy pay route.
- */
 export async function getOrCreateRazorpayPayLink(caseId: string): Promise<string | null> {
   const cached = cache.get(caseId);
   if (cached && cached.expires > Date.now()) return cached.url;

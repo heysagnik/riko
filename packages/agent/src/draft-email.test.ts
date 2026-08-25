@@ -65,17 +65,14 @@ describe("draftEmail", () => {
     const raw = `Thought process: writing email.\n\`\`\`json\n${JSON.stringify(VALID_DRAFT)}\n\`\`\``;
     const model = mockModel(raw);
 
-    // Using an unsupported schema model ID to force the text fallback parsing path
     const fallbackModel = new MockLanguageModelV3({
       doGenerate: async () => {
         throw new UnsupportedFunctionalityError({ functionality: "structuredOutput" });
       },
     });
 
-    // Trigger unsupported once
     await draftEmail(fallbackModel, "unsupported-model-id", { facts }).catch(() => {});
 
-    // Now it uses plain text path with extractJsonObject
     const result = await draftEmail(model, "unsupported-model-id", { facts });
     expect(result.draft.subject).toBe(VALID_DRAFT.subject);
   });
@@ -84,7 +81,6 @@ describe("draftEmail", () => {
     const invalidJson = JSON.stringify({ subject: "Only subject" });
     const model = mockModel(invalidJson);
 
-    // Force text fallback model ID
     await draftEmail(
       new MockLanguageModelV3({
         doGenerate: async () => {

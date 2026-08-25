@@ -38,7 +38,7 @@ export function LiveLedgerPreview() {
         <div
           key={sample.id}
           className={cn(
-            "flex items-center gap-4 border-b border-line px-4 py-3 text-sm transition-all duration-300 ease-out last:border-b-0",
+            "flex items-center gap-4 border-b border-line px-4 py-3 text-sm transition-[transform,opacity] duration-[220ms] ease-out last:border-b-0",
             index < visibleCount ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0",
           )}
         >

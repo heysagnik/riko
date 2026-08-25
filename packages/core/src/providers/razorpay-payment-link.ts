@@ -17,10 +17,6 @@ export interface RazorpayPaymentLink {
   shortUrl: string;
 }
 
-/**
- * Creates a Razorpay-hosted payment link, keeping card data out of this app.
- * Razorpay's own notifications stay off so we don't double-contact the customer.
- */
 export async function createRazorpayPaymentLink(
   input: RazorpayPaymentLinkInput,
 ): Promise<RazorpayPaymentLink> {
@@ -32,6 +28,7 @@ export async function createRazorpayPaymentLink(
       authorization: `Basic ${auth}`,
       "content-type": "application/json",
     },
+    signal: AbortSignal.timeout(15_000),
     body: JSON.stringify({
       amount: input.amountMinor,
       currency: input.currency.toUpperCase(),
@@ -73,11 +70,6 @@ async function razorpayGet(keyId: string, keySecret: string, path: string): Prom
   return response.json();
 }
 
-/**
- * Resolves the amount a subscription will charge next: subscription -> plan ->
- * amount. Webhook payloads carry no amount, and every downstream consumer
- * (review thresholds, metrics, payment links) needs one.
- */
 export async function fetchRazorpaySubscriptionAmount(
   keyId: string,
   keySecret: string,

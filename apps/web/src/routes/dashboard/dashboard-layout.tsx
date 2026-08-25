@@ -14,9 +14,6 @@ import {
   GearIcon,
   SunIcon,
   MoonIcon,
-  ChartBarIcon,
-  EnvelopeOpenIcon,
-  BugIcon,
 } from "@phosphor-icons/react";
 import { Logo } from "../../components/logo.js";
 import {
@@ -37,10 +34,7 @@ import { useTheme } from "../../lib/theme.js";
 const navItems = [
   { to: "/dashboard", label: "Overview", end: true, icon: HouseIcon },
   { to: "/dashboard/cases", label: "Cases", end: false, icon: ListChecksIcon },
-  { to: "/dashboard/report", label: "Recovery report", end: false, icon: ChartBarIcon },
   { to: "/dashboard/exceptions", label: "Exceptions", end: false, icon: WarningIcon },
-  { to: "/dashboard/reviews", label: "Sent-mail review", end: false, icon: EnvelopeOpenIcon },
-  { to: "/dashboard/failure-codes", label: "Failure codes", end: false, icon: BugIcon },
   { to: "/dashboard/connections", label: "Connections", end: false, icon: PlugIcon },
   { to: "/dashboard/settings", label: "Settings", end: false, icon: GearIcon },
 ];
@@ -109,7 +103,7 @@ export function DashboardLayout() {
 
   const sidebarContent = (
     <>
-      <div className={cn("flex h-12 items-center px-3", collapsed ? "md:justify-center" : "justify-between")}>
+      <div className={cn("flex h-12 items-center pl-4 pr-3", collapsed ? "md:justify-center" : "justify-between")}>
         <Logo className={cn("md:block", collapsed && "md:hidden")} />
         {collapsed ? <Logo compact className="hidden md:block" /> : null}
         <button
@@ -244,7 +238,7 @@ export function DashboardLayout() {
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-64 shrink-0 flex-col border-r border-line bg-surface transition-[transform,width] duration-200 ease-out",
+          "fixed inset-y-0 left-0 z-50 flex w-64 shrink-0 flex-col border-r border-line bg-surface transition-transform duration-200 ease-out md:transition-none",
           "md:static md:z-auto md:translate-x-0 md:border-r-0 md:bg-transparent",
           collapsed ? "md:w-16" : "md:w-56",
           drawerOpen ? "translate-x-0" : "-translate-x-full",

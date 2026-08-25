@@ -46,9 +46,6 @@ export async function loadGateInput(caseId: string): Promise<GateCaseInput> {
     );
 
   const dailyCap = sender?.dailySendCap ?? 500;
-  // An invoice on long terms is not stale because it was issued long ago. What
-  // ages a receivable is time past its due date; everything else ages from when
-  // it happened.
   const ageFrom = exposure.kind === "overdue_receivable" && exposure.dueAt
     ? exposure.dueAt
     : exposure.occurredAt;
@@ -68,8 +65,6 @@ export async function loadGateInput(caseId: string): Promise<GateCaseInput> {
     attemptCount: caseRow.attemptCount,
     hoursSinceLastOutreach,
     failureCategory: payment?.failureCategory ?? "unknown",
-    // Nothing is broken about an abandoned cart or an unpaid invoice, so the
-    // recoverability question only applies to an actual payment failure.
     failureRecoverable: payment ? payment.failureRecoverable : true,
     paymentAgeDays,
     tenantPaused: sender?.outreachPaused ?? false,

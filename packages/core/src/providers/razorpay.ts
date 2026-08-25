@@ -257,8 +257,6 @@ export class RazorpayAdapter implements PaymentProvider {
       }
     }
 
-    // An order carries no customer contact of its own; abandonment is only
-    // actionable when checkout collected one into notes.
     if (order && parsed.event === "order.created") {
       const email = order.notes?.email ?? order.notes?.customer_email ?? null;
       const contact = order.notes?.contact ?? order.notes?.phone ?? null;

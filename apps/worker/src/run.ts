@@ -13,14 +13,13 @@ import { processRetention } from "./jobs/process-retention.js";
 import { loadReplyContext } from "./loaders/load-reply-context.js";
 import { loadGateInput } from "./loaders/load-gate-input.js";
 import { loadRouteInput } from "./loaders/load-route-input.js";
+import { loadReasonCaseInput } from "./loaders/load-reason-case-input.js";
 import { loadCaseFacts } from "./loaders/load-case-facts.js";
 import { loadPendingOutreach } from "./loaders/load-pending-outreach.js";
 import { log } from "./lib/logger.js";
 
 const POLL_INTERVAL_MS = Number(process.env.WORKER_POLL_MS ?? 15_000);
 
-// Replies aren't time-critical the way scheduled sends are, so this runs on a
-// coarser cadence than the rest of the tick to cut LLM calls and DB reads.
 const AGENT_REPLY_INTERVAL_MS = 60_000;
 let lastAgentReplyRunAt = 0;
 
@@ -32,7 +31,7 @@ export async function tick(): Promise<void> {
   await processExposureSweep();
   await processPromises();
   await processWaitingCases();
-  await processNewCases({ loadGateInput, loadRouteInput });
+  await processNewCases({ loadGateInput, loadRouteInput, loadReasonCaseInput });
   await processScheduledDrafts(loadCaseFacts);
   await processDraftingCases(loadCaseFacts);
   await processSendingCases(loadPendingOutreach);

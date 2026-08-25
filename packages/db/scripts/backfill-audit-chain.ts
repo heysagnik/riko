@@ -1,8 +1,6 @@
 import { asc, isNull, sql } from "drizzle-orm";
 import { db, caseEvents, computeEventHash, GENESIS_HASH } from "../src/index.js";
 
-// Links events written before hashing existed, so verification covers all history.
-
 const [{ pending }] = await db
   .select({ pending: sql<number>`count(*)::int` })
   .from(caseEvents)

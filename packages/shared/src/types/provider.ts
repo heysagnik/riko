@@ -25,9 +25,9 @@ export type NormalizedEventKind =
   | "subscription_ended"
   | "subscription_retry_pending"
   | "subscription_halted"
-  /** Checkout started. Only abandonment if no capture follows. */
+
   | "order_created"
-  /** Invoice issued with terms. Only a receivable once past due. */
+
   | "invoice_issued";
 
 export interface NormalizedEvent {
@@ -35,9 +35,9 @@ export interface NormalizedEvent {
   providerAccountId: string;
   kind: NormalizedEventKind;
   providerPaymentId: string;
-  /** Invoice/order/subscription id, stable across retries of the same money. */
+
   providerCorrelationId: string | null;
-  /** Case id echoed back in the notes of a hosted payment link we generated. */
+
   caseIdHint: string | null;
   providerCustomerId: string;
   providerCustomerEmail: string | null;
@@ -50,7 +50,7 @@ export interface NormalizedEvent {
   failureCategory: FailureCategory;
   failureSource: FailureSource;
   providerRetryAt: Date | null;
-  /** Payment terms deadline, invoices only. */
+
   dueAt: Date | null;
   occurredAt: Date;
   raw: unknown;

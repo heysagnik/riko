@@ -2,29 +2,20 @@ export const CONTENT_PLACEHOLDER = "{{content}}";
 
 export const DEFAULT_BRAND_TEMPLATE = `<!doctype html>
 <html>
-  <body style="margin:0;padding:20px 16px;background:#f2f4f7;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;">
+  <body style="margin:0;padding:32px 16px;background:#ffffff;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;margin:0 auto;">
       <tr>
-        <td style="padding:0 4px 14px;font-size:13px;font-weight:600;letter-spacing:0.01em;color:#4b5563;">
+        <td style="padding:0 0 24px;font-size:14px;font-weight:600;letter-spacing:0.01em;color:#111111;">
           {{merchant_name}}
         </td>
       </tr>
       <tr>
-        <td style="background:#ffffff;border:1px solid #e4e7ec;border-radius:12px;overflow:hidden;">
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-            <tr>
-              <td style="height:4px;line-height:4px;font-size:0;background:#2563eb;border-radius:11px 11px 0 0;">&nbsp;</td>
-            </tr>
-            <tr>
-              <td style="padding:28px 28px 20px;font-size:14px;line-height:1.65;color:#1f2430;text-wrap:pretty;word-wrap:break-word;">
-                {{content}}
-              </td>
-            </tr>
-          </table>
+        <td style="font-size:15px;line-height:1.7;color:#1f2430;text-wrap:pretty;word-wrap:break-word;">
+          {{content}}
         </td>
       </tr>
       <tr>
-        <td style="padding:16px 4px 0;font-size:12px;line-height:1.6;color:#9099a8;">
+        <td style="padding:40px 0 0;border-top:1px solid #e5e7eb;font-size:12px;line-height:1.6;color:#9ca3af;">
           Sent by {{merchant_name}} regarding your subscription payment.
         </td>
       </tr>

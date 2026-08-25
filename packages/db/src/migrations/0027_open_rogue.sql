@@ -1,0 +1,1 @@
+ALTER TABLE "outreach" DROP COLUMN "review_sampled";

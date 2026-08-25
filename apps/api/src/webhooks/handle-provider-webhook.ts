@@ -63,8 +63,10 @@ async function lookupFailureCategory(
   db: Database,
   event: NormalizedEvent,
 ): Promise<{ failureCategory: NormalizedEvent["failureCategory"]; recoverable: boolean }> {
+  const adapterCategory = event.failureCategory ?? "unknown";
+
   if (!event.failureCode) {
-    return { failureCategory: event.failureCategory ?? "unknown", recoverable: false };
+    return { failureCategory: adapterCategory, recoverable: event.failureSource === "business" };
   }
   const [entry] = await db
     .select()
@@ -72,16 +74,14 @@ async function lookupFailureCategory(
     .where(and(eq(failureCodeMap.providerId, event.providerId), eq(failureCodeMap.providerCode, event.failureCode)))
     .limit(1);
 
-  const adapterCategory = event.failureCategory ?? "unknown";
-
-  // A mapped "unknown" records that the code itself carries no diagnosis, so it
-  // must not outrank what the adapter inferred from the failure description.
-  // Razorpay's generic `payment_failed` is exactly this case.
   if (entry && !(entry.failureCategory === "unknown" && adapterCategory !== "unknown")) {
     return { failureCategory: entry.failureCategory, recoverable: entry.recoverable };
   }
 
-  return { failureCategory: adapterCategory, recoverable: RECOVERABLE_CATEGORIES.has(adapterCategory) };
+  return {
+    failureCategory: adapterCategory,
+    recoverable: RECOVERABLE_CATEGORIES.has(adapterCategory) || event.failureSource === "business",
+  };
 }
 
 async function upsertCustomer(
@@ -124,9 +124,6 @@ async function upsertCustomer(
 
 const OPEN_STATES = ["NEW", "DRAFTING", "SENDING", "WAITING", "PROMISED"] as const;
 
-// Customer alone misattributes when several cases are open, so prefer the case
-// id we stamped on the pay link, then invoice/order id, then an unambiguous
-// amount match, then most recent.
 async function findRecoveredCase(
   db: Database,
   tenantId: string,
@@ -155,7 +152,6 @@ async function findRecoveredCase(
 
   if (rows.length === 0) return null;
 
-  // Suppressed cases are searchable for holdout recovery, but rank last.
   const open = [
     ...rows.filter((r) => r.case.state !== "SKIPPED"),
     ...rows.filter((r) => r.case.state === "SKIPPED"),
@@ -185,11 +181,7 @@ const EXPOSURE_KIND_FOR_EVENT = {
   invoice_issued: "overdue_receivable",
 } as const;
 
-/**
- * Records money that is only *potentially* at risk. No case opens here: an order
- * is not abandoned until checkout stops, and an invoice is not overdue until it
- * passes its terms. The sweeper decides that later.
- */
+
 async function recordPendingExposure(
   db: Database,
   tenantId: string,
@@ -223,11 +215,7 @@ const SUBSCRIPTION_CATEGORY: Record<string, NormalizedEvent["failureCategory"]> 
   subscription_halted: "invalid_instrument",
 };
 
-/**
- * Subscription risk is money that will be attempted again (or has stopped being
- * attempted). One exposure per subscription, refreshed by every event; the
- * router sequences outreach around the provider's own retry clock.
- */
+
 async function recordSubscriptionExposure(
   db: Database,
   tenantId: string,
@@ -374,8 +362,6 @@ async function applyNormalizedEvent(
   }
 
   if (event.kind === "payment_succeeded") {
-    // Close the pending exposure even when no case exists yet, or the sweeper
-    // will later open one against an order that has already been paid.
     const refs = [event.providerCorrelationId, event.providerPaymentId].filter(
       (ref): ref is string => Boolean(ref),
     );
@@ -422,11 +408,7 @@ async function applyNormalizedEvent(
   return null;
 }
 
-/**
- * Subscription webhooks carry no amount; the router's review threshold, the
- * payment link we later build, and the metrics all need one. Resolve it from
- * the provider while the connection credentials are at hand.
- */
+
 async function withSubscriptionAmount(
   db: Database,
   provider: PaymentProvider,

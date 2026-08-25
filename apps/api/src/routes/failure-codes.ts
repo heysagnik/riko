@@ -21,7 +21,10 @@ failureCodesRouter.get("/failure-codes/unmapped", requireTenant, async (req, res
       .innerJoin(connections, eq(connections.id, payments.connectionId))
       .leftJoin(
         failureCodeMap,
-        and(eq(failureCodeMap.providerId, connections.providerId), eq(failureCodeMap.providerCode, payments.failureCode)),
+        and(
+          sql`${failureCodeMap.providerId}::text = ${connections.providerId}::text`,
+          sql`${failureCodeMap.providerCode}::text = ${payments.failureCode}::text`,
+        ),
       )
       .where(
         and(

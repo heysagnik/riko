@@ -11,7 +11,6 @@ export interface Intervention {
   kind: InterventionKind;
   reason: string;
   waitUntil: Date | null;
-  /** Which rung of the tone ladder the draft must be written at. */
   rung?: string;
 }
 
@@ -23,10 +22,8 @@ export interface InterventionInput {
   amountMinor: number;
   providerRetryAt: Date | null;
   occurredAt: Date;
-  /** Payment terms deadline, receivables only. */
   dueAt: Date | null;
   attemptCount: number;
-  /** Same-kind exposures this customer produced recently, for repeat detection. */
   priorExposures: number;
   now: Date;
   humanReviewMinor: number;

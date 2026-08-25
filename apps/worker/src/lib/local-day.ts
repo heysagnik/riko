@@ -58,10 +58,6 @@ export function localHourFor(timezone: string | null, at: Date = new Date()): nu
   }
 }
 
-/**
- * When a follow-up that fell due outside the contact window may finally go:
- * today's opening if the window has not started yet, tomorrow's if it closed.
- */
 export function nextContactWindowOpen(timeZone?: string | null): Date {
   const tz = timeZone ?? DEFAULT_TIMEZONE;
   const now = new Date();

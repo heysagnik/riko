@@ -1,8 +1,6 @@
-import { useState } from "react";
 import { CaretDownIcon } from "@phosphor-icons/react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { CaseRow, CaseRowMobile } from "../../components/case-row.js";
-import { Badge } from "../../components/ui/badge.js";
 import { Button } from "../../components/ui/button.js";
 import {
   DropdownMenu,
@@ -16,7 +14,7 @@ import { Table, TableBody, TableHead, TableHeader, TableRow } from "../../compon
 import { Tabs, TabsList, TabsTrigger } from "../../components/ui/tabs.js";
 import { ageLabelFromDate, formatAmount, useCases, PAGE_SIZE } from "../../hooks/use-cases.js";
 import { useConnections } from "../../hooks/use-connections.js";
-import { useEscalations, useResolveEscalation, type Escalation, type ResolveAction } from "../../hooks/use-escalations.js";
+import { useEscalations, type Escalation } from "../../hooks/use-escalations.js";
 import { failureLabel, reasonLabel } from "../../lib/labels.js";
 import { cn } from "../../lib/utils.js";
 
@@ -45,34 +43,13 @@ function dateBounds(range: string): { from?: string; to?: string } {
 
 const ATTEMPT_CAP = 3;
 
-const OUTCOME_TEXT: Record<string, string> = {
-  SENDING: "Approved. Riko is sending the draft now.",
-  NEW: "Back with Riko. It will pick this up on the next run.",
-  LOST: "Written off. Riko will not contact them again.",
-};
-
 function NeedsYouRow({
   item,
   currency,
-  onResolved,
 }: {
   item: Escalation;
   currency: string;
-  onResolved: (item: Escalation, state: string) => void;
 }) {
-  const resolve = useResolveEscalation();
-  const [error, setError] = useState<string | null>(null);
-
-  const act = (action: ResolveAction) => {
-    setError(null);
-    resolve.mutate(
-      { caseId: item.id, action },
-      { onSuccess: (result) => onResolved(item, result.state), onError: (e) => setError(e.message) },
-    );
-  };
-
-  const busy = resolve.isPending;
-
   return (
     <li className="border-b border-line py-4">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
@@ -88,72 +65,14 @@ function NeedsYouRow({
       <p className="mt-1 text-sm text-ink-muted">
         {failureLabel(item.failureCategory)} · {reasonLabel(item.closedReason ?? item.interventionReason)}
       </p>
-
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <Button size="sm" onClick={() => act("approve_send")} disabled={busy}>
-          Approve and send
-        </Button>
-        <Button size="sm" variant="outline" onClick={() => act("return_to_queue")} disabled={busy}>
-          Let Riko retry
-        </Button>
-        <Button size="sm" variant="ghost" onClick={() => act("close_unrecoverable")} disabled={busy}>
-          Write off
-        </Button>
-      </div>
-
-      {error ? (
-        <p className="mt-2 text-caption text-lost" role="alert">
-          {error === "no_draft_to_send"
-            ? "There is no draft to approve. Let Riko retry instead."
-            : error === "not_escalated"
-              ? "Someone already resolved this one."
-              : error}
-        </p>
-      ) : null}
-    </li>
-  );
-}
-
-function NeedsYouResolvedRow({ item, state, currency }: { item: Escalation; state: string; currency: string }) {
-  return (
-    <li className="border-b border-line py-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <Link
-          to={`/dashboard/cases/${item.id}`}
-          className="text-sm font-medium text-ink-muted transition-colors duration-150 hover:text-accent"
-        >
-          {item.customerName ?? "Unknown customer"}
-        </Link>
-        <span className="text-figure tabular-nums text-ink-muted">
-          {formatAmount(item.amountMinor, item.currency ?? currency)}
-        </span>
-      </div>
-
-      <p className="mt-1.5 flex flex-wrap items-center gap-x-2 text-sm text-ink">
-        <Badge variant="default">{state}</Badge>
-        {OUTCOME_TEXT[state] ?? "Resolved."}
-      </p>
-
-      <Link
-        to={`/dashboard/cases/${item.id}`}
-        className="mt-1.5 inline-block text-caption text-accent transition-colors duration-150 hover:text-accent-hover"
-      >
-        View case
-      </Link>
     </li>
   );
 }
 
 function NeedsYouView() {
   const { data, isLoading, error, refetch, isRefetching } = useEscalations();
-  const [resolved, setResolved] = useState<{ item: Escalation; state: string }[]>([]);
-
-  const resolvedIds = new Set(resolved.map((r) => r.item.id));
-  const escalations = (data?.escalations ?? []).filter((e) => !resolvedIds.has(e.id));
+  const escalations = data?.escalations ?? [];
   const currency = data?.currency ?? "inr";
-
-  const onResolved = (item: Escalation, state: string) =>
-    setResolved((prev) => (prev.some((r) => r.item.id === item.id) ? prev : [{ item, state }, ...prev]));
 
   if (isLoading) {
     return (
@@ -175,7 +94,7 @@ function NeedsYouView() {
     );
   }
 
-  if (escalations.length === 0 && resolved.length === 0) {
+  if (escalations.length === 0) {
     return (
       <div className="mt-6 border-t border-line pt-10">
         <p className="text-sm text-ink">Nothing waiting on you.</p>
@@ -201,11 +120,8 @@ function NeedsYouView() {
       </div>
 
       <ul className="mt-2">
-        {resolved.map((r) => (
-          <NeedsYouResolvedRow key={r.item.id} item={r.item} state={r.state} currency={currency} />
-        ))}
         {escalations.map((item) => (
-          <NeedsYouRow key={item.id} item={item} currency={currency} onResolved={onResolved} />
+          <NeedsYouRow key={item.id} item={item} currency={currency} />
         ))}
       </ul>
     </>

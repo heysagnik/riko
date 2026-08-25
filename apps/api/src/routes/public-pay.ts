@@ -3,6 +3,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db, cases, customers, exposures, connections, organization, outreach } from "@riko/db";
 import { createRazorpayPaymentLink, decryptSecret } from "@riko/core";
+import { getCachedPayLink } from "@riko/worker/pay-link";
 import { SlidingWindowLimiter } from "@riko/worker/rate-limiter";
 
 export const publicPayRouter = Router();
@@ -39,10 +40,7 @@ interface PayLinkErr {
   error: string;
 }
 
-/**
- * Resolves the emailed /pay/:caseId link to a Razorpay-hosted payment page.
- * The caseId is the capability token, so errors stay terse and leak nothing.
- */
+
 async function resolvePayLink(rawCaseId: unknown): Promise<PayLinkOk | PayLinkErr> {
   const parsed = paramsSchema.safeParse({ caseId: rawCaseId });
   if (!parsed.success) {
@@ -99,6 +97,11 @@ async function resolvePayLink(rawCaseId: unknown): Promise<PayLinkOk | PayLinkEr
   const amount = formatAmount(exposure.amountMinor, exposure.currency);
 
   try {
+    const cachedUrl = getCachedPayLink(caseRow.id);
+    if (cachedUrl) {
+      return { ok: true, payUrl: cachedUrl, merchantName, amount };
+    }
+
     const link = await createRazorpayPaymentLink({
       keyId: connection.providerAccountId,
       keySecret: decryptSecret(connection.accessTokenEncrypted, key),
@@ -131,7 +134,6 @@ publicPayRouter.get("/public/pay/:caseId", async (req, res) => {
   res.json({ payUrl: result.payUrl, merchantName: result.merchantName, amount: result.amount });
 });
 
-// For clients that follow the link without running our JavaScript.
 publicPayRouter.get("/public/pay/:caseId/redirect", async (req, res) => {
   const result = await resolvePayLink(req.params.caseId);
   if (!result.ok) {

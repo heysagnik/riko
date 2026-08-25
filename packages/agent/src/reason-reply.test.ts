@@ -46,7 +46,7 @@ describe("reasonReply", () => {
     expect(result.needsHuman).toBe(false);
   });
 
-  it("flags already_paid as an escalating intent requiring human review", async () => {
+  it("keeps already_paid with the agent - webhooks verify the payment, not a human", async () => {
     const json = JSON.stringify({
       intent: "already_paid",
       confidence: 0.9,
@@ -56,8 +56,21 @@ describe("reasonReply", () => {
 
     const result = await reasonReply(mockModel(json), input);
     expect(result.intent).toBe("already_paid");
-    expect(result.needsHuman).toBe(true);
+    expect(result.needsHuman).toBe(false);
     expect(result.replyText).toBeTruthy();
+  });
+
+  it("keeps hostile-but-resolving replies with the agent", async () => {
+    const json = JSON.stringify({
+      intent: "hostile",
+      confidence: 0.9,
+      rationale: "Customer is rude but the bill still stands.",
+      replyText: "Hi Priya, totally understand the frustration. The quickest fix is right here: https://riko.example/pay/abc",
+    });
+
+    const result = await reasonReply(mockModel(json), input);
+    expect(result.intent).toBe("hostile");
+    expect(result.needsHuman).toBe(false);
   });
 
   it("flags dispute as an escalating intent requiring human review", async () => {

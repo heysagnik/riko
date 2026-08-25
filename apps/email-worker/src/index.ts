@@ -3,7 +3,6 @@ import PostalMime, { type Address } from "postal-mime";
 export interface Env {
   RIKO_INBOUND_URL: string;
   RIKO_INBOUND_SECRET: string;
-  /** Address that receives anything Riko could not route. Optional. */
   FORWARD_UNMATCHED_TO?: string;
 }
 
@@ -17,7 +16,6 @@ interface EmailMessage {
   forward(rcptTo: string, headers?: Headers): Promise<void>;
 }
 
-// Anything larger is a newsletter or an attachment dump, not a customer reply.
 const MAX_BYTES = 1_000_000;
 
 function joinAddresses(list: Address[] | undefined): string | null {
@@ -34,8 +32,6 @@ export default {
 
     const parsed = await PostalMime.parse(message.raw);
 
-    // The envelope recipient is what carries the plus-tag. Headers can be
-    // rewritten by forwarding; the envelope cannot.
     const to = [message.to, joinAddresses(parsed.to)].filter(Boolean).join(", ");
 
     const headers: Record<string, string> = {};
@@ -63,15 +59,10 @@ export default {
       body: JSON.stringify(body),
     });
 
-    // A 5xx means Riko is down, not that the mail is bad. Rejecting would tell
-    // the sender their reply bounced; failing here makes the sender retry later.
     if (response.status >= 500) {
       throw new Error(`Riko inbound returned ${response.status}`);
     }
 
-    // A 4xx (usually a secret mismatch) is silent otherwise: the function
-    // returns normally and the tail log reads "Ok" exactly like a real
-    // success, hiding a misconfiguration behind what looks like delivery.
     if (response.status >= 400) {
       const text = await response.text().catch(() => "");
       console.error(`Riko inbound rejected the message: ${response.status} ${text}`);

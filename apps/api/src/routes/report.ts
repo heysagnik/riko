@@ -7,7 +7,7 @@ import { z } from "zod";
 export const reportRouter = Router();
 
 const querySchema = z.object({
-  windowDays: z.coerce.number().int().min(1).max(365).default(30),
+  windowDays: z.coerce.number().int().min(1).max(3650).optional(),
   format: z.enum(["json", "csv"]).default("json"),
 });
 
@@ -89,7 +89,11 @@ reportRouter.get("/report", requireTenant, async (req, res) => {
   }
   const { windowDays, format } = parsed.data;
   const tenantId = req.tenant!.tenantId;
-  const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
+  const since = windowDays ? new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000) : null;
+
+  const scope = since
+    ? and(eq(cases.tenantId, tenantId), gte(cases.openedAt, since))
+    : eq(cases.tenantId, tenantId);
 
   const rows = await withTenant(db, tenantId, (tx) => tx
     .select({
@@ -114,7 +118,7 @@ reportRouter.get("/report", requireTenant, async (req, res) => {
     .innerJoin(customers, eq(customers.id, cases.customerId))
     .innerJoin(exposures, eq(exposures.id, cases.exposureId))
     .leftJoin(payments, eq(payments.id, exposures.paymentId))
-    .where(and(eq(cases.tenantId, tenantId), gte(cases.openedAt, since)))
+    .where(scope)
     .orderBy(desc(cases.openedAt)));
 
   const typedRows: ReportRow[] = rows.map((r) => ({ ...r }));
@@ -123,7 +127,7 @@ reportRouter.get("/report", requireTenant, async (req, res) => {
     res.setHeader("content-type", "text/csv; charset=utf-8");
     res.setHeader(
       "content-disposition",
-      `attachment; filename="riko-recovery-report-${windowDays}d-${new Date().toISOString().slice(0, 10)}.csv"`,
+      `attachment; filename="riko-recovery-report-${windowDays ? `${windowDays}d` : "all"}-${new Date().toISOString().slice(0, 10)}.csv"`,
     );
     res.send(toCsv(typedRows));
     return;
@@ -142,7 +146,7 @@ reportRouter.get("/report", requireTenant, async (req, res) => {
   const selfHealed = recovered.filter((r) => !contacted(r));
 
   res.json({
-    windowDays,
+    windowDays: windowDays ?? "all",
     generatedAt: new Date().toISOString(),
     totals: {
       cases: typedRows.length,

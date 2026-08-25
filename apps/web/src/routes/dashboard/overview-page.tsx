@@ -38,10 +38,19 @@ export function OverviewPage() {
 
   return (
     <div>
-      <h1 className="text-title text-ink">Overview</h1>
-      <p className="mt-1 text-sm text-ink-muted">
-        {metrics ? `Last ${metrics.windowDays} days` : "Recovery at a glance"}
-      </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-title text-ink">Overview</h1>
+          <p className="mt-1 text-sm text-ink-muted">
+            {metrics ? `Last ${metrics.windowDays} days` : "Recovery at a glance"}
+          </p>
+        </div>
+        <a href="/api/report?format=csv" download="riko-recovery-report.csv">
+          <Button variant="outline" size="sm">
+            Download recovery report (CSV)
+          </Button>
+        </a>
+      </div>
 
       {metricsLoading ? (
         <Skeleton className="mt-10 h-28 w-full" />

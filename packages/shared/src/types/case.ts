@@ -1,4 +1,3 @@
-/** What put the money at risk. One case opens against one exposure. */
 export type ExposureKind = "payment_failure" | "checkout_abandonment" | "overdue_receivable";
 
 export type CaseState =

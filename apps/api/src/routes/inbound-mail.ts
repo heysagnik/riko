@@ -27,8 +27,6 @@ const inboundSchema = z.object({
 });
 
 const OPEN_STATES = ["NEW", "DRAFTING", "SENDING", "WAITING", "PROMISED"] as const;
-// A handed-off case is terminal for the state machine, but a person is still
-// reading the thread - their incoming replies must still land somewhere.
 const RECORDABLE_STATES = [...OPEN_STATES, "ESCALATED"] as const;
 
 function requireInboundSecret(header: string | undefined): boolean {
@@ -49,18 +47,12 @@ inboundMailRouter.post("/inbound/mail", async (req, res) => {
     return;
   }
 
-  // Clients quote the original below a reply, and every outbound email ends in
-  // an unsubscribe footer - classifying the raw body reads that footer as the
-  // customer's own words.
   const message = { ...parsed.data, text: stripQuotedContent(parsed.data.text) };
   const classification = classifyInbound(message);
   const messageIds = extractMessageIds(message);
 
   const taggedCaseId = caseIdFromRecipient([message.to, message.cc, message.headers?.["delivered-to"]]);
 
-  // The In-Reply-To/References chain can point at the very first ladder email
-  // (logged in `outreach`) or at a later merchant/agent turn (logged only in
-  // `caseMessages`) - a customer replying to either must still resolve.
   async function matchByMessageId(): Promise<{ caseId: string } | undefined> {
     if (messageIds.length === 0) return undefined;
     const [fromOutreach] = await db
@@ -88,8 +80,6 @@ inboundMailRouter.post("/inbound/mail", async (req, res) => {
     return;
   }
 
-  // An out-of-office is not a human deciding anything. Escalating on it would
-  // put noise in front of a person and stop a recovery that is still viable.
   if (classification.kind === "auto_reply" || classification.kind === "soft_bounce") {
     res.json({ status: "noted", caseId: match.caseId, classification: classification.kind });
     return;
@@ -106,8 +96,6 @@ inboundMailRouter.post("/inbound/mail", async (req, res) => {
     return;
   }
 
-  // Already with a person - just log what the customer said instead of running
-  // it through the (open-state-only) transition logic below.
   if (caseRow.state === "ESCALATED") {
     if (classification.kind === "hard_bounce") {
       await db.update(customers).set({ bouncedAt: new Date() }).where(eq(customers.id, caseRow.customerId));
@@ -136,15 +124,12 @@ inboundMailRouter.post("/inbound/mail", async (req, res) => {
     return;
   }
 
-  // A reply that names a date and a commitment is answerable by the system; one
-  // that does not is a conversation, and belongs with a person.
   const promise =
     classification.kind === "reply" && caseRow.state === "WAITING"
       ? extractPromise(message.text)
       : null;
   const usablePromise = promise && promise.confidence >= MIN_PROMISE_CONFIDENCE ? promise : null;
 
-  // Answered by the agent on the next worker tick.
   if (classification.kind === "reply" && !usablePromise) {
     const [seqRow] = await db
       .select({ maxSeq: sql<number>`coalesce(max(${caseMessages.seq}), -1)::int` })
@@ -168,9 +153,6 @@ inboundMailRouter.post("/inbound/mail", async (req, res) => {
     return;
   }
 
-  // Suppression is customer-wide and must never fail on a state that lacks the
-  // transition (NEW/DRAFTING/SENDING): mark the person, close every open case
-  // they have, and acknowledge — regardless of where this one case stood.
   if (classification.kind === "hard_bounce" || classification.kind === "unsubscribe_request") {
     const isBounce = classification.kind === "hard_bounce";
     const flag = isBounce ? { bouncedAt: new Date() } : { unsubscribedAt: new Date() };
@@ -218,7 +200,6 @@ inboundMailRouter.post("/inbound/mail", async (req, res) => {
         state: transition.toState,
         closedAt: transition.toState === "SKIPPED" || transition.toState === "ESCALATED" ? new Date() : null,
         closedReason: transition.reason,
-        // Hold the ladder until the promised date, then judge it.
         nextActionAt: usablePromise ? usablePromise.promisedFor : undefined,
       })
       .where(eq(cases.id, caseRow.id));

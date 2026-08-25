@@ -16,7 +16,6 @@ const model = nim.chatModel(MODEL);
 
 const MIN_LEAD_MS = 15 * 60 * 1000;
 const MAX_LEAD_MS = 48 * 60 * 60 * 1000;
-const REVIEW_SAMPLE_RATE = 0.1;
 
 export async function processScheduledDrafts(
   loadFacts: (caseId: string) => Promise<CaseFacts>,
@@ -73,7 +72,6 @@ export async function processScheduledDrafts(
           subject: outcome.draft.subject,
           body: outcome.draft.bodyText,
           scheduledFor,
-          reviewSampled: Math.random() < REVIEW_SAMPLE_RATE,
         });
 
         await appendCaseEvent(tx, {

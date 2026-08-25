@@ -19,7 +19,6 @@ const baseFacts: CaseFacts = {
   unsubscribeUrl: "https://pay.example.com/unsub/abc",
 };
 
-// Generates a 70-word body meeting ideal word count (55-110 words)
 function idealBody(customerName: string, payUrl: string, unsubUrl: string): string {
   return (
     `Hi ${customerName}, your recent subscription payment of 49.99 for Acme Inc did not go through ` +
@@ -33,19 +32,18 @@ function idealBody(customerName: string, payUrl: string, unsubUrl: string): stri
 describe("scoreDraft", () => {
   it("scores high for an ideal, reassuring, and personalized draft", () => {
     const draft: EmailDraft = {
-      subject: "Update your payment method for Acme", // 36 chars (in 25-60 range)
+      subject: "Update your payment method for Acme",
       bodyText: idealBody(baseFacts.customerName, baseFacts.updatePaymentMethodUrl, baseFacts.unsubscribeUrl),
       bodyHtml: "<p>html version</p>",
     };
 
     const score = scoreDraft(draft, baseFacts);
-    // Base 60 + reason(10) + subject(8) + wordCount(12) + cta(10) + name(5) + reassurance(8) = 113 -> clamped to 100
     expect(score).toBe(100);
   });
 
   it("penalizes corporate filler phrases", () => {
     const cleanDraft: EmailDraft = {
-      subject: "Update payment method", // 21 chars (< 25)
+      subject: "Update payment method",
       bodyText: `Hi Alex, please update here: ${baseFacts.updatePaymentMethodUrl} ${baseFacts.unsubscribeUrl}`,
       bodyHtml: "",
     };
@@ -89,7 +87,7 @@ describe("scoreDraft", () => {
 
     const singleScore = scoreDraft(singleCtaDraft, baseFacts);
     const multiScore = scoreDraft(multiCtaDraft, baseFacts);
-    expect(singleScore - multiScore).toBe(15); // +10 for single, -5 for multi = 15 point diff
+    expect(singleScore - multiScore).toBe(15);
   });
 
   it("rewards naming the concrete failure reason", () => {

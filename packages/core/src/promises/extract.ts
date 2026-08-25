@@ -1,5 +1,4 @@
 export interface PromiseCandidate {
-  /** When the customer said they would pay. */
   promisedFor: Date;
   amountMinor: number | null;
   confidence: number;
@@ -8,10 +7,8 @@ export interface PromiseCandidate {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** Below this we ask a person rather than trusting the reading. */
 export const MIN_PROMISE_CONFIDENCE = 0.6;
 
-/** A promise further out than this is a brush-off, not a commitment. */
 export const MAX_PROMISE_HORIZON_DAYS = 60;
 
 const INTENT_PHRASES = [
@@ -70,13 +67,10 @@ function atNoon(date: Date): Date {
 
 interface DateHit {
   date: Date;
-  /** How literally the text named the date, rather than implying it. */
   precision: number;
 }
 
 function findDate(text: string, now: Date): DateHit | null {
-  // Hour-scale commitments are the fastest promises there are; without these
-  // "I'll pay in an hour" reads as no promise at all and the case stalls.
   const inHours = text.match(/\bin (?:an?|\d{1,2})\s*(?:hr|hrs|hour|hours)\b/);
   if (inHours) {
     const digits = inHours[0].match(/\d{1,2}/);
@@ -100,7 +94,6 @@ function findDate(text: string, now: Date): DateHit | null {
     return { date: atNoon(new Date(now.getTime() + n * mult * DAY_MS)), precision: 0.85 };
   }
 
-  // "by the 15th", "on 15th", "before 3rd"
   const dayOfMonth = text.match(/\b(?:by|on|before|around)\s+(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)\b/);
   if (dayOfMonth) {
     const day = Number(dayOfMonth[1]);
@@ -112,7 +105,6 @@ function findDate(text: string, now: Date): DateHit | null {
     }
   }
 
-  // "15 March", "March 15"
   for (const [index, month] of MONTHS.entries()) {
     const pattern = new RegExp(`\\b(?:(\\d{1,2})\\s+${month}|${month}\\s+(\\d{1,2}))`, "i");
     const hit = text.match(pattern);
@@ -156,9 +148,6 @@ function findAmountMinor(text: string): number | null {
   return Number.isFinite(value) ? Math.round(value * 100) : null;
 }
 
-// Deliberately conservative: a missed promise costs one delayed follow-up, but a
-// hallucinated one silently stops a live recovery. Ambiguity scores low and ends
-// up in front of a person instead.
 export function extractPromise(replyText: string, now: Date = new Date()): PromiseCandidate | null {
   const text = replyText.toLowerCase();
 
@@ -174,8 +163,6 @@ export function extractPromise(replyText: string, now: Date = new Date()): Promi
   const horizonDays = (hit.date.getTime() - now.getTime()) / DAY_MS;
   if (horizonDays < -1 || horizonDays > MAX_PROMISE_HORIZON_DAYS) return null;
 
-  // A named date the customer volunteered is worth more than one we inferred
-  // from "next month", and a stated amount corroborates the whole reading.
   const amountMinor = findAmountMinor(replyText);
   const confidence = Math.min(0.95, hit.precision + (amountMinor === null ? 0 : 0.05));
 

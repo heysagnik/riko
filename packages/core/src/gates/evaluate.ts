@@ -4,16 +4,12 @@ import type { GateCaseInput, GateResult, PolicyLimit } from "./types.js";
 export const MAX_ATTEMPTS = 3;
 const COOLDOWN_HOURS = 48;
 
-// A failed card goes stale quickly; an unpaid invoice is still collectable at
-// 30 days, which is exactly when the ladder hands it to a person.
 const MAX_AGE_DAYS: Record<ExposureKind, number> = {
   payment_failure: 21,
   checkout_abandonment: 7,
   overdue_receivable: 30,
 };
 
-// The first email in a case may go out whenever it becomes due; every contact
-// after that holds to daytime hours in the customer's own timezone.
 export const CONTACT_WINDOW_START_HOUR = 7;
 export const CONTACT_WINDOW_END_HOUR = 23;
 
@@ -55,7 +51,7 @@ export function evaluateGates(input: GateCaseInput): GateResult {
   return { eligible: true, reason: null };
 }
 
-/** Every bound the agent operates under, for the policy page to render. */
+
 export function describePolicyLimits(): PolicyLimit[] {
   return [
     { id: "max_attempts", label: "Emails per case", value: String(MAX_ATTEMPTS), group: "budget" },

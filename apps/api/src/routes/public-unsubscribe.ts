@@ -47,7 +47,6 @@ publicUnsubscribeRouter.post("/public/unsubscribe/:customerId", async (req, res)
       .set({ state: "SKIPPED", closedAt: new Date(), closedReason: "customer_unsubscribed" })
       .where(inArray(cases.id, open.map((c) => c.id)));
 
-    // One chain per case, so these append individually rather than as a batch.
     for (const c of open) {
       await appendCaseEvent(tx, {
         tenantId: customer.tenantId,

@@ -569,15 +569,12 @@ provider-agnostic: any SMTP relay works, no provider webhook setup required.
   manager AND one offline copy. Rotating it requires re-encrypting every
   encrypted column — plan it as maintenance, not an emergency.
 
-### Sent-mail quality review
-
-Every send is sampled (10%) onto `GET /api/reviews` for a human to read what
-actually went out. Skim it weekly; a drift in tone shows up there before it
-shows up in unsubscribes.
-
 ### Alerts
 
 Each tenant sets an alert webhook on the dashboard's Settings → Alerts page.
 Riko posts a short JSON message there when a case is escalated to a human,
 when the circuit breaker pauses outreach, or when drafting fails three times.
 Any incoming-webhook URL that accepts `{text}` works.
+
+The full per-case recovery history exports as CSV from Settings →
+"Download recovery report".

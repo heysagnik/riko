@@ -6,10 +6,8 @@ import { caseEvents } from "./schema/cases.js";
 type CaseEventRow = typeof caseEvents.$inferSelect;
 type CaseEventInsert = typeof caseEvents.$inferInsert;
 
-/** Accepts either the pool-backed client or an open transaction. */
 export type DbExecutor = Database | Parameters<Parameters<Database["transaction"]>[0]>[0];
 
-/** Predecessor of a case's first event, so every chain starts from a fixed point. */
 export const GENESIS_HASH = "0".repeat(64);
 
 export interface HashableCaseEvent {
@@ -40,8 +38,6 @@ export type AppendCaseEventInput = Omit<
   "id" | "seq" | "createdAt" | "prevHash" | "hash"
 >;
 
-// Concurrent appends are serialised by the case row lock the caller already
-// holds from the compare-and-set that performed the transition.
 export async function appendCaseEvent(
   tx: DbExecutor,
   input: AppendCaseEventInput,
@@ -89,7 +85,6 @@ export interface ChainVerification {
   caseId: string;
   chainValid: boolean;
   eventCount: number;
-  /** Written before hashing existed, so unverifiable either way. */
   unhashedCount: number;
   brokenAtSeq: number | null;
   events: ChainEntry[];

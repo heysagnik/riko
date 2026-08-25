@@ -28,6 +28,14 @@ export async function loadCaseFacts(caseId: string): Promise<CaseFacts> {
     ? Math.max(0, Math.floor((Date.now() - exposure.dueAt.getTime()) / DAY_MS))
     : null;
 
+  const rawObj = payment?.raw && typeof payment.raw === "object" ? (payment.raw as Record<string, unknown>) : null;
+  const failureDescription =
+    typeof rawObj?.error_description === "string"
+      ? rawObj.error_description
+      : typeof rawObj?.message === "string"
+        ? rawObj.message
+        : null;
+
   return {
     caseId,
     exposureKind: exposure.kind,
@@ -36,6 +44,8 @@ export async function loadCaseFacts(caseId: string): Promise<CaseFacts> {
     amountMinor: exposure.amountMinor,
     currency: exposure.currency,
     failureCategory: payment?.failureCategory ?? "unknown",
+    failureSource: payment?.failureSource ?? null,
+    failureDescription,
     customerName: customer.name ?? "there",
     attemptNumber: caseRow.attemptCount + 1,
     priorSubjects: priorOutreach.map((o) => o.subject),

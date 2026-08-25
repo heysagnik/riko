@@ -10,8 +10,6 @@ function assignArm(): "treatment" | "holdout" {
   return randomInt(100) < HOLDOUT_PERCENT ? "holdout" : "treatment";
 }
 
-// Opens cases only once an exposure has actually gone wrong. Splitting this from
-// ingestion is what keeps a slow checkout from being read as an abandoned one.
 export async function processExposureSweep(now: Date = new Date()): Promise<number> {
   const abandonedBefore = new Date(now.getTime() - ABANDONMENT_SWEEP_MINUTES * 60 * 1000);
 
@@ -42,8 +40,6 @@ export async function processExposureSweep(now: Date = new Date()): Promise<numb
   let opened = 0;
 
   for (const exposure of due) {
-    // A cart that failed at the card is a payment failure with its own case, not
-    // an abandonment. Opening a second case would chase the same money twice.
     if (exposure.kind === "checkout_abandonment") {
       const [failed] = await db
         .select({ id: payments.id })

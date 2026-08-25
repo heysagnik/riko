@@ -13,8 +13,6 @@ const BASE_RULES = `Rules:
 - Output must match the requested JSON shape: { "subject": string, "bodyText": string, "bodyHtml": string }.
 - The unsubscribe link must appear in the footer of both bodyText and bodyHtml.`;
 
-// The policy engine picks the rung; the model only writes to it, and the
-// validator rejects a draft that reaches past the rung it was given.
 const RUNG_BRIEF: Record<string, string> = {
   instrument_fix: `A payment failed for a reason only the cardholder can fix.
 - Lead with the fact that the payment did not go through, and why.
@@ -70,9 +68,25 @@ const RUNG_BRIEF_HINGLISH: Record<string, string> = {
 - Payment ya turant contact ki request karo. Phir bhi koi dhamki nahi.`,
 };
 
+const MERCHANT_FAULT_BRIEF = `The payment attempt failed because of a configuration issue on our side (for example, international cards are switched off, so only domestic cards go through). The customer did nothing wrong.
+- Say plainly and briefly that the payment did not go through because of a setting on our end.
+- Never blame the customer, their card, or their bank.
+- Invite them to complete the payment with the link: trying a different card or payment method may work.
+- Tone: matter-of-fact and helpful, lightly apologetic. No urgency, no pressure.`;
+
+const MERCHANT_FAULT_BRIEF_HINGLISH = `Payment attempt hamari side ki configuration issue ki wajah se fail hua hai (for example, international cards band hain, to sirf domestic cards chalega). Customer ne kuch galat nahi kiya.
+- Saaf-saaf aur chhote mein batao ki hamari setting ki wajah se payment nahi hua.
+- Customer ko, unke card ko, ya bank ko blame mat karo.
+- Link se payment complete karne ka invite do: dusra card ya method try karne se ho sakta hai.
+- Tone: seedha aur helpful, halka sa sorry. No urgency, no pressure.`;
+
 export function buildSystemPrompt(facts: CaseFacts): string {
+  const merchantFault = facts.failureSource === "business";
+
   if (facts.language === "hinglish") {
-    const brief = RUNG_BRIEF_HINGLISH[facts.rung ?? "instrument_fix"] ?? RUNG_BRIEF_HINGLISH.instrument_fix!;
+    const brief = merchantFault
+      ? MERCHANT_FAULT_BRIEF_HINGLISH
+      : (RUNG_BRIEF_HINGLISH[facts.rung ?? "instrument_fix"] ?? RUNG_BRIEF_HINGLISH.instrument_fix!);
     return `You write one email on behalf of a merchant.
 
 ${brief}
@@ -82,7 +96,9 @@ ${HINGLISH_RULES}
 ${BASE_RULES}`;
   }
 
-  const brief = RUNG_BRIEF[facts.rung ?? "instrument_fix"] ?? RUNG_BRIEF.instrument_fix!;
+  const brief = merchantFault
+    ? MERCHANT_FAULT_BRIEF
+    : (RUNG_BRIEF[facts.rung ?? "instrument_fix"] ?? RUNG_BRIEF.instrument_fix!);
   return `You write one email on behalf of a merchant.
 
 ${brief}

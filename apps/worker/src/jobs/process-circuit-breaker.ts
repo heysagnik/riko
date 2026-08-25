@@ -4,10 +4,8 @@ import { alert, log } from "../lib/logger.js";
 
 const WINDOW_HOURS = 24;
 
-/** Enough sends for a rate to mean something. */
 const MIN_SENDS = 20;
 
-/** Opt-outs per send above which the campaign is doing harm, not recovery. */
 const UNSUBSCRIBE_RATE_LIMIT = Number(process.env.UNSUBSCRIBE_RATE_LIMIT ?? 0.1);
 
 export interface BreakerResult {
@@ -18,8 +16,6 @@ export interface BreakerResult {
   tripped: boolean;
 }
 
-// Pauses outreach when opt-outs spike. A campaign costing customers is worse
-// than one recovering nothing, and nobody is watching the dashboard at 3am.
 export async function processCircuitBreaker(now: Date = new Date()): Promise<BreakerResult[]> {
   const since = new Date(now.getTime() - WINDOW_HOURS * 60 * 60 * 1000);
 

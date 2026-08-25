@@ -112,6 +112,20 @@ describe("routeIntervention", () => {
   it("escalates a merchant configuration fault instead of emailing the customer", () => {
     const result = routeIntervention(input({ failureSource: "business" }));
     expect(result.kind).toBe("escalate_human");
+    expect(result.reason).toBe("merchant_configuration_fault");
+  });
+
+  it("escalates a merchant configuration fault even above the review threshold", () => {
+    const result = routeIntervention(
+      input({ failureSource: "business", amountMinor: 9000000, humanReviewMinor: 5000000 }),
+    );
+    expect(result.kind).toBe("escalate_human");
+    expect(result.reason).toBe("merchant_configuration_fault");
+  });
+
+  it("never lets a merchant configuration fault override a fraud signal", () => {
+    const result = routeIntervention(input({ failureSource: "business", failureCode: "stolen_card" }));
+    expect(result.kind).toBe("stop_never_contact");
   });
 });
 
@@ -133,7 +147,7 @@ describe("human review override", () => {
     expect(approved.kind).toBe("outreach_email");
   });
 
-  it("proceeds on a merchant configuration fault once approved", () => {
+  it("proceeds on a merchant configuration fault once a person has approved it", () => {
     const approved = routeIntervention(input({ failureSource: "business", humanApproved: true }));
     expect(approved.kind).toBe("outreach_email");
   });

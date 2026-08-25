@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import express from "express";
+import express, { type NextFunction, type Request, type Response } from "express";
 import { toNodeHandler } from "better-auth/node";
 import { auth } from "./auth.js";
 import { razorpayWebhookRouter } from "./webhooks/razorpay.js";
@@ -15,7 +15,6 @@ import { publicPayRouter } from "./routes/public-pay.js";
 import { inboundMailRouter } from "./routes/inbound-mail.js";
 import { auditRouter } from "./routes/audit.js";
 import { policyRouter } from "./routes/policy.js";
-import { reviewsRouter } from "./routes/reviews.js";
 import { trackingRouter } from "./routes/tracking.js";
 import { reportRouter } from "./routes/report.js";
 import { failureCodesRouter } from "./routes/failure-codes.js";
@@ -43,12 +42,11 @@ app.get("/health", (_req, res) => {
   });
 });
 
-// Providers post here directly, so this stays off the /api prefix.
 app.use(razorpayWebhookRouter);
 
 const loginLimiter = ipRateLimiter(10);
-app.post("/api/auth/*", loginLimiter);
-app.all("/api/auth/*", toNodeHandler(auth));
+app.post(/^\/api\/auth\/.*$/, loginLimiter);
+app.all(/^\/api\/auth\/.*$/, toNodeHandler(auth));
 
 app.use(express.json({ limit: "1mb" }));
 app.use(inboundMailRouter);
@@ -62,24 +60,36 @@ app.use("/api", publicUnsubscribeRouter);
 app.use("/api", publicPayRouter);
 app.use("/api", auditRouter);
 app.use("/api", policyRouter);
-app.use("/api", reviewsRouter);
 app.use("/api", reportRouter);
 app.use("/api", failureCodesRouter);
 
 app.use(trackingRouter);
 
-// In production the API also serves the built SPA, so the browser sees one
-// origin and the session cookie needs no CORS or SameSite relaxation.
 const webDist = path.resolve(fileURLToPath(new URL("../../web/dist", import.meta.url)));
 if (existsSync(webDist)) {
   app.use(express.static(webDist));
-  app.get("*", (_req, res) => {
+  app.use((req, res, next) => {
+    if (req.method !== "GET" || req.path.startsWith("/api") || req.path.startsWith("/webhooks")) {
+      next();
+      return;
+    }
     res.sendFile(path.join(webDist, "index.html"));
   });
 }
 
+app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  log.error("unhandled_route_error", { error: error instanceof Error ? error.message : String(error) });
+  if (!res.headersSent) {
+    res.status(500).json({ error: "internal_error" });
+  }
+});
+
 const server = app.listen(process.env.PORT ?? 4000, () => {
   process.stdout.write(`api listening on ${process.env.PORT ?? 4000}\n`);
+});
+
+process.on("unhandledRejection", (reason) => {
+  log.error("unhandled_rejection", { reason: reason instanceof Error ? reason.message : String(reason) });
 });
 
 async function shutdown(): Promise<void> {
@@ -103,8 +113,6 @@ if (process.env.RUN_WORKER === "1") {
     workerShutdown = shutdownWorker;
     void runWorker();
   } catch (error) {
-    // A failed import must not take the API down with it, and must not be
-    // silent either: /health carries the reason the worker never started.
     workerBootError = error instanceof Error ? error.message : String(error);
     process.stderr.write(`worker failed to start: ${workerBootError}\n`);
   }

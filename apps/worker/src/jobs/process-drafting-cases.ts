@@ -9,7 +9,6 @@ import { log, alert } from "../lib/logger.js";
 
 const DRAFT_FRESH_MS = 12 * 60 * 60 * 1000;
 const BATCH_LIMIT = 200;
-const REVIEW_SAMPLE_RATE = 0.1;
 
 async function alertWebhookFor(tenantId: string): Promise<string | null> {
   const [row] = await db
@@ -134,7 +133,6 @@ export async function processDraftingCases(loadFacts: (caseId: string) => Promis
             caseId: caseRow.id,
             subject: outcome.draft.subject,
             body: outcome.draft.bodyText,
-            reviewSampled: Math.random() < REVIEW_SAMPLE_RATE,
           });
         }
       });

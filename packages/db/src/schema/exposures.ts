@@ -10,8 +10,6 @@ export const exposureKindEnum = pgEnum("exposure_kind", [
   "overdue_receivable",
 ]);
 
-// Money at risk, whatever put it at risk. One case per exposure, so the gates,
-// policy engine, ledger and audit trail stay source-agnostic.
 export const exposures = pgTable(
   "exposures",
   {
@@ -22,7 +20,6 @@ export const exposures = pgTable(
     kind: exposureKindEnum("kind").notNull(),
     amountMinor: integer("amount_minor").notNull(),
     currency: text("currency").notNull(),
-    // Provider-side identity of the thing at risk: order, invoice or payment id.
     sourceRef: text("source_ref").notNull(),
     paymentId: uuid("payment_id").references(() => payments.id, { onDelete: "set null" }),
     dueAt: timestamp("due_at", { withTimezone: true }),
@@ -33,8 +30,6 @@ export const exposures = pgTable(
     raw: jsonb("raw"),
   },
   (table) => [
-    // Sweepers re-examine the same order or invoice repeatedly; this is what
-    // stops a second pass opening a duplicate case against the same money.
     uniqueIndex("exposures_source_uidx").on(table.tenantId, table.kind, table.sourceRef),
     index("exposures_due_idx").on(table.kind, table.dueAt),
   ],

@@ -2,18 +2,11 @@ import { sql } from "drizzle-orm";
 import { db, customers, cases, exposures } from "@riko/db";
 import { log } from "../lib/logger.js";
 
-/** DPDP/GDPR-style erasure window: PII older than this gets scrubbed. */
 const RETENTION_DAYS = 365;
 const BATCH_LIMIT = 200;
 
 const REDACTED_EMAIL = Buffer.from("redacted@riko.local").toString("base64");
 
-/**
- * Scrubs personal data for customers with no open cases whose last exposure is
- * past the retention window. Rows stay (aggregate metrics keep working);
- * identity fields go. The scrubbed email fails decryption-to-address checks
- * downstream and the gates treat them as undeliverable.
- */
 export async function processRetention(now: Date = new Date()): Promise<number> {
   const cutoff = new Date(now.getTime() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
 

@@ -46,8 +46,6 @@ describe("routeIntervention: checkout abandonment", () => {
   });
 
   it("never diagnoses an abandoned cart as a card fault", () => {
-    // The payment policy would escalate on failureCategory "unknown"; the
-    // abandonment policy must not, because there is no failure to diagnose.
     expect(routeIntervention(input()).kind).not.toBe("escalate_human");
   });
 });

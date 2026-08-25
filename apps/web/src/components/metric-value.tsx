@@ -6,7 +6,6 @@ export interface MetricValueProps {
   delta?: string;
   deltaTone?: "positive" | "negative" | "neutral";
   className?: string;
-  /** Marks the label as carrying extra context (e.g. behind a tooltip) with a dotted underline. */
   hint?: boolean;
 }
 

@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, integer, jsonb, boolean, uniqueIndex, index } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, integer, jsonb, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { organization } from "./auth.js";
 import { cases } from "./cases.js";
 
@@ -36,7 +36,6 @@ export const outreach = pgTable(
     clickedAt: timestamp("clicked_at", { withTimezone: true }),
     bouncedAt: timestamp("bounced_at", { withTimezone: true }),
     repliedAt: timestamp("replied_at", { withTimezone: true }),
-    reviewSampled: boolean("review_sampled").notNull().default(false),
   },
   (table) => [index("outreach_case_created_idx").on(table.caseId, table.createdAt)],
 );

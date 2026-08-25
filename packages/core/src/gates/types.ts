@@ -5,16 +5,13 @@ export interface GateCaseInput {
   customerHasDeliverableEmail: boolean;
   customerUnsubscribed: boolean;
   customerHasBounced: boolean;
-  /** DND, open dispute, distress, or anything else a person flagged. */
   customerSuppressed: boolean;
-  /** Hour of day where the customer is, 0-23. */
   localHour: number;
   tenantHasVerifiedSender: boolean;
   attemptCount: number;
   hoursSinceLastOutreach: number | null;
   failureCategory: FailureCategory;
   failureRecoverable: boolean;
-  /** Age of the exposure, not of the case. */
   paymentAgeDays: number;
   tenantPaused: boolean;
   tenantWithinDailySendCap: boolean;

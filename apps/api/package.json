@@ -11,16 +11,16 @@
     "start:prod": "tsx src/server.ts"
   },
   "dependencies": {
+    "@riko/agent": "workspace:*",
     "@riko/core": "workspace:*",
     "@riko/db": "workspace:*",
     "@riko/shared": "workspace:*",
-    "@riko/agent": "workspace:*",
+    "@riko/worker": "workspace:*",
     "better-auth": "^1.1.0",
     "drizzle-orm": "^0.45.2",
-    "express": "^4.21.0",
-    "zod": "^3.24.0",
-    "@riko/worker": "workspace:*",
-    "tsx": "^4.19.0"
+    "express": "^5.2.1",
+    "tsx": "^4.19.0",
+    "zod": "^3.24.0"
   },
   "devDependencies": {
     "@types/express": "^4.17.0",

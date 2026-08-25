@@ -14,20 +14,29 @@ function escapeHtml(value: string): string {
 const URL_PATTERN = /https?:\/\/\S+/g;
 const LABEL_PATTERN = /([A-Za-z][\w '-]{2,60}):\s*$/;
 
+function normalizePaymentCta(label: string): string {
+  const l = label.trim().toLowerCase();
+  if (l === "update your payment method" || l === "update payment method" || l === "update payment") {
+    return "Update payment details";
+  }
+  return label;
+}
+
 function renderButton(label: string, url: string): string {
+  const displayLabel = normalizePaymentCta(label);
   return (
-    `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:6px 0 16px;">` +
-    `<tr><td style="border-radius:6px;background:#2563eb;">` +
-    `<a href="${escapeHtml(url)}" style="display:inline-block;padding:10px 20px;font-size:14px;font-weight:600;` +
-    `color:#ffffff;text-decoration:none;border-radius:6px;font-family:inherit;">${escapeHtml(label)}</a>` +
+    `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:4px 0 20px;">` +
+    `<tr><td style="background:#111111;">` +
+    `<a href="${escapeHtml(url)}" style="display:inline-block;padding:11px 18px;font-size:14px;font-weight:500;` +
+    `color:#ffffff;text-decoration:none;font-family:inherit;">${escapeHtml(displayLabel)}</a>` +
     `</td></tr></table>`
   );
 }
 
 function renderFooterLink(label: string, url: string): string {
   return (
-    `<p style="margin:16px 0 0;text-align:center;font-size:12px;">` +
-    `<a href="${escapeHtml(url)}" style="color:#8b94a3;text-decoration:underline;">${escapeHtml(label)}</a>` +
+    `<p style="margin:20px 0 0;font-size:12px;">` +
+    `<a href="${escapeHtml(url)}" style="color:#9ca3af;text-decoration:underline;">${escapeHtml(label)}</a>` +
     `</p>`
   );
 }
@@ -133,9 +142,6 @@ export async function loadPendingOutreach(caseId: string): Promise<SendableOutre
         }
       : null;
 
-  // Replies land on shared infrastructure, not the merchant's domain: the
-  // case-id tag already identifies the tenant, so one inbox serves everyone.
-  // A tenant-set reply_to still wins, but it must be a domain we receive on.
   const replyToBase = sender.replyTo ?? INBOUND_REPLY_BASE;
 
   const rendered = renderBrandTemplate(sender.brandTemplateHtml, {
@@ -148,13 +154,7 @@ export async function loadPendingOutreach(caseId: string): Promise<SendableOutre
     : `${rendered}${pixel}`;
   const unsubscribeUrl = `${APP_BASE_URL}/unsubscribe/${customer.id}`;
 
-  const lazyPayUrl = `${APP_BASE_URL}/pay/${caseId}`;
-  const directPayUrl = await getOrCreateRazorpayPayLink(caseId);
-  const bodyText = directPayUrl ? pending.body.replaceAll(lazyPayUrl, directPayUrl) : pending.body;
-  const renderedBodyHtml = bodyHtml.replaceAll(
-    lazyPayUrl,
-    escapeHtml(directPayUrl ?? lazyPayUrl),
-  );
+  await getOrCreateRazorpayPayLink(caseId);
 
   const addressFooterText = sender.addressLine ? `\n\n${sender.fromName}\n${sender.addressLine}` : "";
   const addressFooterHtml = sender.addressLine
@@ -168,8 +168,8 @@ export async function loadPendingOutreach(caseId: string): Promise<SendableOutre
     replyTo: replyToBase ? taggedReplyTo(replyToBase, caseId) : null,
     toEmail: decryptSecret(customer.emailEncrypted, requireEncryptionKey()),
     subject: pending.subject,
-    bodyText: `${bodyText}${addressFooterText}`,
-    bodyHtml: `${renderedBodyHtml}${addressFooterHtml}`,
+    bodyText: `${pending.body}${addressFooterText}`,
+    bodyHtml: `${bodyHtml}${addressFooterHtml}`,
     addressLine: sender.addressLine,
     unsubscribeUrl,
     smtp,

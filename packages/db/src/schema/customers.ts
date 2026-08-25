@@ -15,8 +15,6 @@ export const customers = pgTable(
     locale: text("locale"),
     unsubscribedAt: timestamp("unsubscribed_at", { withTimezone: true }),
     bouncedAt: timestamp("bounced_at", { withTimezone: true }),
-    // Distinct from unsubscribe: a person decided we must not contact this
-    // customer, for a reason the customer never asked us to record.
     suppressedAt: timestamp("suppressed_at", { withTimezone: true }),
     suppressionReason: text("suppression_reason"),
     timezone: text("timezone"),

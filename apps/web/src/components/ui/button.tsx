@@ -30,7 +30,6 @@ export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
   asChild?: boolean;
-  /** Disables the press-scale feedback, for contexts where the motion would be distracting. */
   static?: boolean;
 }
 

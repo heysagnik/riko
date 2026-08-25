@@ -4,13 +4,8 @@ import { applyTransition } from "@riko/core";
 
 const HOUR_MS = 60 * 60 * 1000;
 
-/** Silence after a broken promise, before the ladder is allowed to resume. */
 const COOLING_OFF_HOURS = 72;
 
-/**
- * Judges promises that have come due. A kept promise closes itself through the
- * payment webhook, so anything still open past its date was broken.
- */
 export async function processPromises(now: Date = new Date()): Promise<{ broken: number }> {
   const overdue = await db
     .select({

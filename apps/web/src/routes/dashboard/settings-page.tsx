@@ -21,18 +21,26 @@ const LABEL_PATTERN = /([A-Za-z][\w '-]{2,60}):\s*$/;
 
 function renderButton(label: string, url: string): string {
   return (
-    `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:6px 0 16px;">` +
-    `<tr><td style="border-radius:6px;background:#2563eb;">` +
-    `<a href="${escapeHtml(url)}" style="display:inline-block;padding:10px 20px;font-size:14px;font-weight:600;` +
-    `color:#ffffff;text-decoration:none;border-radius:6px;font-family:inherit;">${escapeHtml(label)}</a>` +
+    `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:4px 0 20px;">` +
+    `<tr><td style="background:#111111;">` +
+    `<a href="${escapeHtml(url)}" style="display:inline-block;padding:11px 18px;font-size:14px;font-weight:500;` +
+    `color:#ffffff;text-decoration:none;font-family:inherit;">${escapeHtml(normalizePaymentCta(label))}</a>` +
     `</td></tr></table>`
   );
 }
 
+function normalizePaymentCta(label: string): string {
+  const l = label.trim().toLowerCase();
+  if (l === "update your payment method" || l === "update payment method" || l === "update payment") {
+    return "Update payment details";
+  }
+  return label;
+}
+
 function renderFooterLink(label: string, url: string): string {
   return (
-    `<p style="margin:16px 0 0;text-align:center;font-size:12px;">` +
-    `<a href="${escapeHtml(url)}" style="color:#8b94a3;text-decoration:underline;">${escapeHtml(label)}</a>` +
+    `<p style="margin:20px 0 0;font-size:12px;">` +
+    `<a href="${escapeHtml(url)}" style="color:#9ca3af;text-decoration:underline;">${escapeHtml(label)}</a>` +
     `</p>`
   );
 }
@@ -203,8 +211,10 @@ export function SettingsPage() {
 
   return (
     <div>
-      <h1 className="text-title text-ink">Settings</h1>
-      <p className="mt-1 text-sm text-ink-muted">Sender identity, delivery, and outreach controls for your account.</p>
+      <div>
+        <h1 className="text-title text-ink">Settings</h1>
+        <p className="mt-1 text-sm text-ink-muted">Sender identity, delivery, and outreach controls for your account.</p>
+      </div>
 
       <div className="mt-6 overflow-x-auto lg:hidden">
         <Tabs value={activeSection} onValueChange={setActiveSection}>
@@ -432,7 +442,11 @@ export function SettingsPage() {
                   {error}
                 </p>
               ) : null}
-              {saved ? <p className="mt-6 text-sm text-recovered">Saved.</p> : null}
+              {saved ? (
+                <p className="mt-6 text-sm text-recovered animate-in fade-in-0 slide-in-from-top-1 duration-150 ease-out" role="status">
+                  Saved.
+                </p>
+              ) : null}
 
               <div className="mt-8">
                 <Button type="submit" disabled={save.isPending}>

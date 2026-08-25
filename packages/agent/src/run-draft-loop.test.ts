@@ -38,7 +38,6 @@ function makeValidDraft(scoreHigh = true): EmailDraft {
 }
 
 function makeInvalidDraft(): EmailDraft {
-  // Invalid: missing customer name and amount
   return {
     subject: "Payment failed",
     bodyText: "Your payment failed. Update: https://pay.example.com/update/abc https://pay.example.com/unsub/abc",
@@ -80,7 +79,6 @@ describe("runDraftLoop", () => {
     if (outcome.status === "valid") {
       expect(outcome.draft.subject).toBe(highDraft.subject);
     }
-    // 2 logs: 1 draft_email + 1 validate_draft
     expect(logs.length).toBe(2);
     expect(logs[0]!.tool).toBe("draft_email");
     expect(logs[1]!.tool).toBe("validate_draft");
@@ -100,7 +98,6 @@ describe("runDraftLoop", () => {
     if (outcome.status === "valid") {
       expect(outcome.draft.subject).toBe(valid.subject);
     }
-    // Attempt 1: draft + validate (failed) -> Attempt 2: draft + validate (success >= 80) = 4 logs
     expect(logs.length).toBe(4);
   });
 
@@ -111,7 +108,6 @@ describe("runDraftLoop", () => {
     const model = new MockLanguageModelV3({
       doGenerate: async () => {
         calls += 1;
-        // Fail both generateObject and generateText on attempt 1
         if (calls <= 2) {
           throw new Error("Provider timeout 504");
         }
@@ -150,7 +146,6 @@ describe("runDraftLoop", () => {
       expect(outcome.lastFailures.length).toBeGreaterThan(0);
       expect(outcome.lastFailures.some((f) => f.includes("customer_name_present") || f.includes("amount_present"))).toBe(true);
     }
-    // 3 attempts * (1 draft + 1 validate) = 6 logs
     expect(logs.length).toBe(6);
   });
 });

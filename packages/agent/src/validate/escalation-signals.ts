@@ -3,11 +3,6 @@ export interface EscalationSignal {
   detail: string;
 }
 
-// Small classification models are prone to overconfidence: they can assign a
-// high confidence score to an intent that ignores language a human reviewer
-// would flag immediately. These patterns scan the customer's raw message
-// directly, independent of what the model decided, so a mis-classified
-// dispute or threat cannot slip through on self-reported confidence alone.
 const ESCALATION_PATTERNS: { rule: string; patterns: RegExp[] }[] = [
   {
     rule: "legal_language",
@@ -23,8 +18,6 @@ const ESCALATION_PATTERNS: { rule: string; patterns: RegExp[] }[] = [
       /\bregulator\b/i,
       /\bpolice\b/i,
       /\blegal action\b/i,
-      // Indian-specific regulatory and law-enforcement escalation paths a
-      // merchant collections agent has no authority to argue against.
       /\brbi\b/i,
       /\breserve bank\b/i,
       /\bombudsman\b/i,
@@ -43,7 +36,6 @@ const ESCALATION_PATTERNS: { rule: string; patterns: RegExp[] }[] = [
       /\bunauthori[sz]ed\b/i,
       /\bscam\b/i,
       /\bidentity theft\b/i,
-      // Hinglish/vernacular equivalents seen in Indian customer replies.
       /\bdhokha\b/i,
       /\bfraud (kiya|kar liya)\b/i,
       /\bgalat (paisa|amount) kaat/i,

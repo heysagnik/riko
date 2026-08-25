@@ -13,7 +13,6 @@ interface Step {
   reason: string | null;
 }
 
-/** Builds a correctly linked chain, the way appendCaseEvent would have. */
 function buildChain(steps: Step[]): Row[] {
   let prevHash = GENESIS_HASH;
   return steps.map((step, index) => {
@@ -122,7 +121,6 @@ describe("verifyChainRows", () => {
     rows.splice(2, 1);
     const result = verifyChainRows(CASE_ID, rows);
     expect(result.chainValid).toBe(false);
-    // The gap surfaces at the orphan, not at the removed row.
     expect(result.brokenAtSeq).toBe(4);
   });
 

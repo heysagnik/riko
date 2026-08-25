@@ -12,11 +12,7 @@ import { OverviewPage } from "./routes/dashboard/overview-page.js";
 import { CaseListPage } from "./routes/dashboard/case-list-page.js";
 import { CaseDetailPage } from "./routes/dashboard/case-detail-page.js";
 import { ExceptionsPage } from "./routes/dashboard/exceptions-page.js";
-import { ReportPage } from "./routes/dashboard/report-page.js";
-import { ReviewsPage } from "./routes/dashboard/reviews-page.js";
-import { FailureCodesPage } from "./routes/dashboard/failure-codes-page.js";
 import { ConnectionsPage } from "./routes/dashboard/connections-page.js";
-
 import { SettingsPage } from "./routes/dashboard/settings-page.js";
 
 export const router = createBrowserRouter([
@@ -41,9 +37,6 @@ export const router = createBrowserRouter([
           { path: "cases", element: <CaseListPage /> },
           { path: "cases/:caseId", element: <CaseDetailPage /> },
           { path: "exceptions", element: <ExceptionsPage /> },
-          { path: "report", element: <ReportPage /> },
-          { path: "reviews", element: <ReviewsPage /> },
-          { path: "failure-codes", element: <FailureCodesPage /> },
           { path: "connections", element: <ConnectionsPage /> },
           { path: "settings", element: <SettingsPage /> },
         ],

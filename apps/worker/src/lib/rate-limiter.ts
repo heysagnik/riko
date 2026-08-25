@@ -45,8 +45,6 @@ export class SlidingWindowLimiter {
   }
 }
 
-// Shared across every tenant: the provider caps requests per minute regardless
-// of who is asking, so this must be one bucket, not one per tenant.
 export const llmRateLimiter = new SlidingWindowLimiter(40, 60_000);
 
 export async function processWithConcurrency<T>(
@@ -64,8 +62,6 @@ export async function processWithConcurrency<T>(
   await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, runNext));
 }
 
-// Interleaves cases across tenants so one tenant with a large backlog cannot
-// starve the others within a single tick.
 export function roundRobinByTenant<T extends { tenantId: string }>(rows: T[]): T[] {
   const byTenant = new Map<string, T[]>();
   for (const row of rows) {

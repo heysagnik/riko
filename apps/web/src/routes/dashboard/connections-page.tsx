@@ -211,7 +211,9 @@ export function ConnectionsPage() {
               <div className="mt-1 flex gap-2">
                 <input type="text" readOnly value={WEBHOOK_URL} className={`${inputClass} mt-0 font-mono text-caption`} />
                 <Button type="button" variant="outline" onClick={handleCopyWebhookUrl}>
-                  {copiedUrl ? "Copied" : "Copy"}
+                  <span key={copiedUrl ? "copied" : "copy"} className="animate-in fade-in duration-150 ease-out">
+                    {copiedUrl ? "Copied" : "Copy"}
+                  </span>
                 </Button>
               </div>
             </label>
@@ -231,7 +233,9 @@ export function ConnectionsPage() {
                   onClick={handleCopyWebhookSecret}
                   disabled={webhookSecretLoading || !webhookSecretData}
                 >
-                  {copiedSecret ? "Copied" : "Copy"}
+                  <span key={copiedSecret ? "copied" : "copy"} className="animate-in fade-in duration-150 ease-out">
+                    {copiedSecret ? "Copied" : "Copy"}
+                  </span>
                 </Button>
               </div>
             </label>

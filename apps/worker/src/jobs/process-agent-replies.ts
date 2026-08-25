@@ -15,14 +15,10 @@ const nim = createOpenAICompatible({
 });
 const model = nim.chatModel(process.env.NVIDIA_NIM_MODEL ?? "meta/llama-3.1-8b-instruct");
 
-// A customer who keeps writing should reach a person, not an endless bot.
 const MAX_AGENT_REPLIES = Number(process.env.MAX_AGENT_REPLIES ?? 5);
 
 const ANSWERABLE_STATES = ["WAITING", "PROMISED"] as const;
 
-// DB/SMTP work can overlap across cases; the LLM call itself still queues on
-// the shared rate limiter, so this just controls how much non-LLM work runs
-// at once.
 const REPLY_CONCURRENCY = 8;
 
 function quoteLines(body: string): string {
@@ -97,9 +93,6 @@ export async function processAgentReplies({ loadReplyContext }: AgentReplyDeps):
       const ctx = await loadReplyContext(caseRow.id);
       if (!ctx.smtp) return;
 
-      // The customer is live right now, so the agent answers immediately:
-      // suppression, the tenant pause, and the daily cap still bind, but the
-      // contact window does not gate replies to inbound messages.
       if (ctx.customerSuppressed) return;
       if (ctx.tenantPaused || !ctx.withinDailyCap) return;
 
@@ -123,11 +116,6 @@ export async function processAgentReplies({ loadReplyContext }: AgentReplyDeps):
         .set({ intent: reasoning.intent, confidence: reasoning.confidence, rationale: reasoning.rationale })
         .where(eq(caseMessages.id, latest.id));
 
-      // The model's self-reported confidence is not trustworthy on its own -
-      // small models are prone to overconfidence on messages containing
-      // legal, dispute, or distress language. Scan the customer's raw
-      // message independently so a mis-classified case still reaches a
-      // person even when the model was confident.
       const escalationSignals = detectEscalationSignals(latest.body);
       const needsHuman = reasoning.needsHuman || escalationSignals.length > 0;
 

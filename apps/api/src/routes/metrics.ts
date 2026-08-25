@@ -8,7 +8,6 @@ export const metricsRouter = Router();
 
 const CONTACTED_STATES = new Set(["SENDING", "WAITING"]);
 
-/** Below this per arm, a lift figure is noise rather than a finding. */
 const MIN_ARM_SIZE = 30;
 
 const COST_PER_SEND_MINOR = Number(process.env.COST_PER_SEND_MINOR ?? 0);
@@ -66,10 +65,6 @@ metricsRouter.get("/metrics", requireTenant, async (req, res) => {
   const attributed = recovered.filter((r) => contactedIds.has(r.id));
   const selfHealed = recovered.filter((r) => !contactedIds.has(r.id));
 
-  // Lift only means something between like populations. Cases the router
-  // deliberately suppressed (fraud, provider retry, human review) were never
-  // candidates for contact, so counting them as "treatment" dilutes the
-  // treatment rate with cases the agent never touched and invents a deficit.
   const contactable = rows.filter((r) => r.intervention === "outreach_email");
   const treatment = contactable.filter((r) => r.arm !== "holdout");
   const holdout = contactable.filter((r) => r.arm === "holdout");

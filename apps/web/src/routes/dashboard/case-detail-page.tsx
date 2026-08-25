@@ -14,7 +14,7 @@ import { Skeleton } from "../../components/ui/skeleton.js";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip.js";
 import { useCaseDetail, type AgentActionRow, type CaseEventRow, type CaseMessageRow } from "../../hooks/use-case-detail.js";
 import { formatAmount } from "../../hooks/use-cases.js";
-import { useCloseCase, useHandOffCase, useReplyToCase } from "../../hooks/use-escalations.js";
+import { useCloseCase, useHandOffCase, useReplyToCase, useResolveEscalation } from "../../hooks/use-escalations.js";
 import { failureLabel, intentLabel, interventionLabel, INTERVENTION_TONE, reasonDescription, reasonLabel } from "../../lib/labels.js";
 import { cn } from "../../lib/utils.js";
 
@@ -98,6 +98,7 @@ function DraftCard({
 
 function ReplyComposer({ caseId }: { caseId: string }) {
   const reply = useReplyToCase();
+  const resolve = useResolveEscalation();
   const [open, setOpen] = useState(false);
   const [body, setBody] = useState("");
   const [sent, setSent] = useState(false);
@@ -118,8 +119,16 @@ function ReplyComposer({ caseId }: { caseId: string }) {
 
   if (!open) {
     return (
-      <div className="mt-6 flex items-center justify-end gap-3">
+      <div className="mt-6 flex flex-wrap items-center justify-end gap-3">
         {sent ? <span className="text-caption text-recovered">Sent.</span> : null}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => resolve.mutate({ caseId, action: "return_to_queue" })}
+          disabled={resolve.isPending}
+        >
+          {resolve.isPending ? "Retrying…" : "Let Riko retry"}
+        </Button>
         <Button size="sm" onClick={() => setOpen(true)}>
           Reply
         </Button>
@@ -165,6 +174,7 @@ function ReplyComposer({ caseId }: { caseId: string }) {
 function CaseActionsMenu({ caseId, isEscalated }: { caseId: string; isEscalated: boolean }) {
   const handOff = useHandOffCase();
   const close = useCloseCase();
+  const resolve = useResolveEscalation();
 
   return (
     <DropdownMenu>
@@ -179,7 +189,12 @@ function CaseActionsMenu({ caseId, isEscalated }: { caseId: string; isEscalated:
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         {isEscalated ? (
-          <DropdownMenuItem onSelect={() => close.mutate(caseId)}>Close the case</DropdownMenuItem>
+          <>
+            <DropdownMenuItem onSelect={() => resolve.mutate({ caseId, action: "return_to_queue" })}>
+              Let Riko retry
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => close.mutate(caseId)}>Close the case</DropdownMenuItem>
+          </>
         ) : (
           <>
             <DropdownMenuItem onSelect={() => handOff.mutate(caseId)}>Hand off</DropdownMenuItem>
@@ -274,7 +289,7 @@ function AgentWork({
         </button>
 
         {openChecks ? (
-          <ol className="mt-2.5 space-y-2 border-t border-line/60 pt-2.5">
+          <ol className="mt-2.5 space-y-2 border-t border-line/60 pt-2.5 animate-in fade-in-0 slide-in-from-top-1 duration-150 ease-out">
             {entries.map((entry) => {
               if (entry.kind !== "action") return null;
               const { item } = entry;
@@ -303,6 +318,26 @@ function AgentWork({
                         </ul>
                       </div>
                     )}
+                  </li>
+                );
+              }
+
+              if (item.tool === "reason_payment_case" && item.output && typeof item.output === "object") {
+                const out = item.output as { decision?: string; rationale?: string; confidence?: number };
+                return (
+                  <li key={item.id} className="text-caption">
+                    <span className="inline-flex items-center gap-2">
+                      <Badge variant={out.decision === "contact" ? "accent" : out.decision === "wait" ? "waiting" : "lost"}>
+                        {out.decision === "contact"
+                          ? "Decided to contact"
+                          : out.decision === "wait"
+                            ? "Decided to wait"
+                            : out.decision === "stop"
+                              ? "Decided to stop"
+                              : "Decided to escalate"}
+                      </Badge>
+                      {out.rationale ? <span className="text-ink-muted">{out.rationale}</span> : null}
+                    </span>
                   </li>
                 );
               }
@@ -361,6 +396,7 @@ export function CaseDetailPage() {
   const { caseId } = useParams<{ caseId: string }>();
   const navigate = useNavigate();
   const { data, isLoading, error, refetch, isRefetching } = useCaseDetail(caseId ?? "");
+  const resolve = useResolveEscalation();
 
   const goBack = () => {
     if (window.history.length > 1) navigate(-1);
@@ -401,10 +437,6 @@ export function CaseDetailPage() {
   const inboundMessages = messages.filter((m) => m.direction === "inbound");
   const latestInbound = inboundMessages[inboundMessages.length - 1];
 
-  // A merchant reply logs both a "merchant_replied" case event and a
-  // caseMessages row for the same action. Fold them into one timeline step
-  // instead of showing "Merchant replied" followed by a mislabeled "Riko
-  // replied" bubble for the same send.
   const excludedEventIds = new Set<string>();
   const merchantMessageIds = new Set<string>();
   const merchantReplyEvents = events.filter((e) => e.reason === "merchant_replied");
@@ -473,6 +505,7 @@ export function CaseDetailPage() {
       entry.item.reason === "scheduled_draft_used" ||
       entry.item.reason === "outreach_sent" ||
       entry.item.reason === "agent_answered" ||
+      entry.item.reason?.startsWith("agent_") ||
       entry.item.fromState === "DRAFTING" ||
       entry.item.fromState === "SENDING";
 
@@ -670,6 +703,16 @@ export function CaseDetailPage() {
                               ? "The automated reply limit was reached for this thread. Handed over to continue directly."
                               : "Automated outreach is paused while you handle this conversation."}
                 </p>
+                <div className="mt-3.5 border-t border-lost/20 pt-3">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => resolve.mutate({ caseId: caseRow.id, action: "return_to_queue" })}
+                    disabled={resolve.isPending}
+                  >
+                    {resolve.isPending ? "Retrying…" : "Let Riko retry"}
+                  </Button>
+                </div>
               </section>
             ) : isPromised ? (
               <section className="min-w-0 rounded-lg border border-waiting/30 bg-waiting/[0.04] px-4 py-3.5 shadow-sm">

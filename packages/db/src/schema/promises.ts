@@ -4,8 +4,6 @@ import { cases } from "./cases.js";
 
 export const promiseStateEnum = pgEnum("promise_state", ["open", "kept", "broken", "cancelled"]);
 
-// Holding a commitment as state is what stops the ladder climbing over someone
-// who already answered.
 export const promises = pgTable(
   "promises",
   {

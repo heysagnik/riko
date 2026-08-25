@@ -25,7 +25,6 @@ const INVALID_TRANSITION = Symbol("invalid");
 
 function transition(from: CaseState, trigger: CaseTrigger): TransitionResult | typeof INVALID_TRANSITION {
   switch (from) {
-    // Payment can land mid-pipeline, so recovery wins from every open state.
     case "NEW":
       if (trigger.type === "payment_succeeded") return { toState: "RECOVERED", reason: "payment_succeeded" };
       if (trigger.type === "gates_passed") return { toState: "DRAFTING", reason: null };
@@ -48,7 +47,6 @@ function transition(from: CaseState, trigger: CaseTrigger): TransitionResult | t
     case "WAITING":
       if (trigger.type === "payment_succeeded") return { toState: "RECOVERED", reason: "payment_succeeded" };
       if (trigger.type === "promise_captured") return { toState: "PROMISED", reason: "promise_to_pay" };
-      // The agent handled the reply itself; the thread stays open for the answer.
       if (trigger.type === "agent_answered") return { toState: "WAITING", reason: "agent_answered" };
       if (trigger.type === "customer_replied") return { toState: "ESCALATED", reason: "customer_reply" };
       if (trigger.type === "customer_unsubscribed") {
@@ -61,13 +59,10 @@ function transition(from: CaseState, trigger: CaseTrigger): TransitionResult | t
       }
       return INVALID_TRANSITION;
 
-    // A promise pauses the ladder. Only payment, a broken promise, or the
-    // customer withdrawing consent moves the case on from here.
     case "PROMISED":
       if (trigger.type === "payment_succeeded") return { toState: "RECOVERED", reason: "promise_kept" };
       if (trigger.type === "promise_broken") return { toState: "WAITING", reason: "promise_broken" };
       if (trigger.type === "agent_answered") return { toState: "PROMISED", reason: "agent_answered" };
-      // Writing again after promising means something changed. A person reads it.
       if (trigger.type === "customer_replied" || trigger.type === "promise_captured") {
         return { toState: "ESCALATED", reason: "reply_after_promise" };
       }
@@ -80,7 +75,6 @@ function transition(from: CaseState, trigger: CaseTrigger): TransitionResult | t
       }
       return INVALID_TRANSITION;
 
-    // Suppressed cases still get paid; the holdout arm's rate depends on it.
     case "SKIPPED":
       if (trigger.type === "payment_succeeded") {
         return { toState: "RECOVERED", reason: "payment_succeeded" };

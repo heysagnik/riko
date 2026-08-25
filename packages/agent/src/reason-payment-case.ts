@@ -18,17 +18,15 @@ export interface ReasonPaymentCaseInput {
   currency: string;
   failureCode: string | null;
   failureDescription: string | null;
-  /** The deterministic categorizer's best guess, given only as context - the model is not bound by it. */
   failureCategoryHint: string;
+  failureSourceHint: string;
   attemptCount: number;
   priorExposures: number;
   hoursSinceFailure: number;
   providerRetryAt: string | null;
   updatePaymentMethodUrl: string;
   unsubscribeUrl: string;
-  /** Anything else known about the case - prior notes, support tickets, past replies. */
   additionalContext: string | null;
-  /** Defaults to the actual current time. Override only for tests/backfills. */
   now?: Date;
 }
 
@@ -48,11 +46,6 @@ const resultSchema = z.object({
   waitHours: z.number().nullable(),
 });
 
-// This prompt intentionally tells the model about the hard rails it does not
-// control. A model that does not know a fraud stop or a compliance gate exists
-// downstream might reason itself into a decision that looks locally sensible
-// but gets silently overridden - worse for debugging than a model that knows
-// its "contact" recommendation on a fraud-flagged case will never actually send.
 const SYSTEM_PROMPT = `detailed thinking off
 
 You are reviewing one payment-failure case for a merchant in India and deciding
@@ -74,8 +67,7 @@ Decide one of:
 - "wait": nothing should happen yet (e.g. the provider is already retrying, the
   failure looks transient, or the customer likely needs more time). Give waitHours.
 - "escalate": a human must look at this before any contact (e.g. the reason is
-  ambiguous, it looks like a merchant-side configuration fault the customer
-  cannot fix, or repeat-failure signals warrant a second look).
+  genuinely ambiguous, or repeat-failure signals warrant a second look).
 - "stop": this looks like fraud, or further contact is clearly wrong. Explain why.
 
 Always choose "stop", never "contact", when the failure code or description
@@ -98,10 +90,17 @@ If and only if you choose "contact", pick the rung (tone) the email should use:
 - firm: repeated non-payment, still respectful. No legal or collections language.
 - formal: multiple past attempts. States the matter plainly, still no threats.
 
-Key judgment call: if the failure is something only the merchant can fix
-(misconfigured account, disabled payment method, invalid order/amount, currency
-or integration errors), contacting the customer is wrong - they cannot act on it.
-Prefer "escalate" for those.
+Merchant-side faults are not a reason to escalate. When the provider reports the
+source as "business" (misconfigured account, disabled payment methods such as
+international cards being switched off, currency or integration errors), the
+customer should simply be told honestly what happened: choose "contact" with
+rung "instrument_fix" - the drafting step knows how to write that notice, and
+retrying with a different card or method often succeeds. Escalate only when the
+failure description suggests something that an honest notice would make worse.
+
+Key judgment call: the customer cannot fix what is broken on the merchant's
+side, but they still deserve to know why their payment did not go through -
+silence reads as their card being at fault.
 
 "wait" is a narrow call, not a default for "I don't know what this is." Only
 choose "wait" when there is a concrete reason to expect this resolves on its
@@ -110,8 +109,10 @@ failure code/description itself names a transient technical condition (gateway
 error, network error, timeout, temporarily unavailable). An unrecognized or
 unmapped failure code with no retry time and no such wording is not evidence of
 "transient" - it is evidence you do not know what happened, and not knowing
-is exactly when a human should look, so choose "escalate" instead. Do not treat
-"the classifier's category is unknown" as itself a reason to wait.
+is exactly when a human should look, so choose "escalate" instead - UNLESS the
+provider reported the source as "business": then the merchant-fault rule above
+applies and you choose "contact". Do not treat "the classifier's category is
+unknown" as itself a reason to wait.
 
 If failureCode is null and additionalContext says no payment was actually
 attempted (an abandoned or unfinished checkout), this is not a failure at all -
@@ -165,12 +166,6 @@ function extractJsonObject(text: string): string {
   return text.slice(start);
 }
 
-/**
- * Handed to the model as reference, not instruction - it explains what
- * attemptCount/priorExposures actually mean operationally (e.g. "3 emails is
- * the cap, so attemptCount: 3 is exhausted, not merely high") without ceding
- * the enforcement itself, which stays in evaluateGates() downstream.
- */
 function formatPolicyContext(): string {
   const limits = describePolicyLimits();
   return limits.map((l) => `- ${l.label}: ${l.value}`).join("\n");
@@ -186,6 +181,7 @@ function buildPrompt(input: ReasonPaymentCaseInput): string {
     `Failure code from the payment provider: ${input.failureCode ?? "none given"}`,
     `Failure description from the payment provider: ${input.failureDescription ?? "none given"}`,
     `A deterministic classifier's best-guess category for this code (context only, not authoritative): ${input.failureCategoryHint}`,
+    `Who the provider reported as the source of the failure (customer / issuer / bank / gateway / network / business / internal): ${input.failureSourceHint}`,
     `Attempts so far this case: ${input.attemptCount}`,
     `Other exposures from this same customer recently: ${input.priorExposures}`,
     `Hours since the failure occurred: ${input.hoursSinceFailure.toFixed(1)}`,
@@ -198,12 +194,6 @@ function buildPrompt(input: ReasonPaymentCaseInput): string {
   ].join("\n");
 }
 
-// The model's judgment on the single highest-stakes decision (never contact a
-// compromised instrument) is not trusted alone: isFraudSignal() is the same
-// deterministic code-list the production router enforces after this call, so
-// running it here too means a model that answers anything but "stop" on a
-// known-fraud code gets corrected before its result ever leaves this
-// function, not just after the fact when it's harder to see why.
 function applyDeterministicOverrides(
   result: ReasonPaymentCaseResult,
   input: ReasonPaymentCaseInput,
@@ -217,6 +207,17 @@ function applyDeterministicOverrides(
       waitHours: null,
     };
   }
+
+  if (result.decision !== "contact" && input.failureSourceHint === "business" && !isFraudSignal(input.failureCode)) {
+    return {
+      decision: "contact",
+      confidence: result.confidence,
+      rationale: `Deterministic override: the provider reported the source as "business", so the customer is informed of the merchant-side fault. Model had proposed "${result.decision}": ${result.rationale}`,
+      rung: "instrument_fix",
+      waitHours: null,
+    };
+  }
+
   return result;
 }
 
@@ -231,18 +232,9 @@ function toResult(parsed: z.infer<typeof resultSchema>): ReasonPaymentCaseResult
 }
 
 export interface ReasonPaymentCaseOptions {
-  /**
-   * Passed straight through to the AI SDK's generateText call. Use this to
-   * disable a provider's reasoning/thinking channel where supported (e.g.
-   * `{ zai: { thinking: { type: "disabled" } } }`) - some providers spend the
-   * entire output budget narrating reasoning before ever answering, which
-   * needs disabling at the request level, not by asking nicely in the prompt.
-   */
   providerOptions?: ProviderMetadata;
 }
 
-// Transport-level maxRetries doesn't cover a response that arrives but fails
-// our schema check; re-prompt with the validation error instead.
 const MAX_PARSE_ATTEMPTS = 2;
 
 export async function reasonPaymentCase(
@@ -255,14 +247,6 @@ export async function reasonPaymentCase(
   let lastError: string | null = null;
 
   for (let attempt = 1; attempt <= MAX_PARSE_ATTEMPTS; attempt += 1) {
-    // This provider's JSON response-format mode is unsupported by the model in
-    // use here, and the model does not reliably honour "respond with only JSON" -
-    // it narrates an unrequested "thinking process" first regardless.
-    // extractJsonObject() below scans past that preamble for the first balanced
-    // object, the same approach reasonReply() uses successfully in production.
-    // Keeping the answer itself small (a decision, not an email) is what makes
-    // that survivable: a long preamble plus a long answer overruns the token
-    // budget and truncates mid-JSON.
     const { text } = await generateText({
       model,
       system: SYSTEM_PROMPT,

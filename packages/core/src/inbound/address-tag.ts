@@ -1,6 +1,5 @@
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Clients mangle In-Reply-To and forwards drop it; a plus-tag survives both.
 export function taggedReplyTo(baseAddress: string, caseId: string): string {
   const at = baseAddress.lastIndexOf("@");
   if (at <= 0) return baseAddress;

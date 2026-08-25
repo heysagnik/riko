@@ -61,7 +61,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         localStorage.setItem(STORAGE_KEY, newTheme);
       }
     } catch {
-      // Storage unavailable or disabled
     }
   };
 

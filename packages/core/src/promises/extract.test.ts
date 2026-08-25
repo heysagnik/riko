@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { extractPromise, MIN_PROMISE_CONFIDENCE } from "./extract.js";
 
-// A Wednesday, so weekday arithmetic is checkable by hand.
 const NOW = new Date("2026-08-19T09:00:00Z");
 
 function days(from: Date, to: Date): number {

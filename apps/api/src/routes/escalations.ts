@@ -162,9 +162,6 @@ escalationsRouter.post("/escalations/:caseId/resolve", requireTenant, async (req
   res.json(result);
 });
 
-// A person takes the case off Riko's queue so they can write to the customer
-// directly. No canned action fits every situation, so this exists alongside
-// the resolve actions above rather than replacing them.
 escalationsRouter.post("/cases/:caseId/hand-off", requireTenant, async (req, res) => {
   const { caseId } = caseIdSchema.parse(req.params);
   const tenantId = req.tenant!.tenantId;
@@ -208,8 +205,6 @@ escalationsRouter.post("/cases/:caseId/hand-off", requireTenant, async (req, res
   res.json(result);
 });
 
-// Closes a case directly, regardless of state, when a person decides Riko
-// should stop working it (e.g. from the case detail page's menu).
 escalationsRouter.post("/cases/:caseId/close", requireTenant, async (req, res) => {
   const { caseId } = caseIdSchema.parse(req.params);
   const tenantId = req.tenant!.tenantId;
@@ -245,8 +240,6 @@ escalationsRouter.post("/cases/:caseId/close", requireTenant, async (req, res) =
   res.json(result);
 });
 
-// Only once a case has been handed off: the person composes the message
-// themselves and Riko just delivers it, same as any other outbound turn.
 escalationsRouter.post("/cases/:caseId/reply", requireTenant, async (req, res) => {
   const { caseId } = caseIdSchema.parse(req.params);
   const body = replySchema.parse(req.body);

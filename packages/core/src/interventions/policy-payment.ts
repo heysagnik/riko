@@ -24,7 +24,6 @@ export function isFraudSignal(failureCode: string | null): boolean {
   return FRAUD_CODES.some((f) => code.includes(f));
 }
 
-
 export function nextSalaryWindow(from: Date): Date {
   const candidate = new Date(from);
   candidate.setUTCHours(4, 0, 0, 0);
@@ -53,7 +52,6 @@ export function routePaymentFailure(input: InterventionInput): Intervention {
       return { kind: "escalate_human", reason: "above_human_review_threshold", waitUntil: null };
     }
   }
-
 
   if (
     input.failureCategory !== "unknown" &&

@@ -12,6 +12,7 @@ const input: ReasonPaymentCaseInput = {
   failureCode: "insufficient_funds",
   failureDescription: "The customer does not have sufficient funds.",
   failureCategoryHint: "insufficient_funds",
+  failureSourceHint: "issuer",
   attemptCount: 0,
   priorExposures: 0,
   hoursSinceFailure: 2,
@@ -44,9 +45,6 @@ describe("reasonPaymentCase", () => {
     expect(result.confidence).toBe(0.8);
   });
 
-  // The model actually used in production narrates an unrequested "thinking
-  // process" before answering, which broke every call until the parser learned
-  // to scan past it. This is that regression.
   it("parses JSON that follows an unrequested reasoning preamble", async () => {
     const withPreamble = `Here's a thinking process:\n\n1. **Analyze the case:** the card had no funds.\n2. **Decide:** contact.\n\n${VALID_JSON}`;
     const result = await reasonPaymentCase(modelReturning(withPreamble), input);
@@ -65,6 +63,24 @@ describe("reasonPaymentCase", () => {
     expect(result.decision).toBe("escalate");
     expect(result.rung).toBeNull();
     expect(result.waitHours).toBeNull();
+  });
+
+  it("forces contact on a business-source fault even when the model escalates", async () => {
+    const escalate = `{"decision":"escalate","confidence":0.8,"rationale":"Unknown code, needs a human.","rung":null,"waitHours":null}`;
+    const result = await reasonPaymentCase(modelReturning(escalate), { ...input, failureSourceHint: "business" });
+    expect(result.decision).toBe("contact");
+    expect(result.rung).toBe("instrument_fix");
+    expect(result.rationale).toContain("Deterministic override");
+  });
+
+  it("still stops on fraud even from a business source", async () => {
+    const contact = `{"decision":"contact","confidence":0.9,"rationale":"Customer can retry.","rung":"instrument_fix","waitHours":null}`;
+    const result = await reasonPaymentCase(modelReturning(contact), {
+      ...input,
+      failureCode: "stolen_card",
+      failureSourceHint: "business",
+    });
+    expect(result.decision).toBe("stop");
   });
 
   it("keeps waitHours only for a wait decision", async () => {

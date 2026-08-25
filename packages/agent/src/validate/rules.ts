@@ -12,12 +12,7 @@ const BLOCKLIST = [
   "waive",
 ];
 
-/**
- * Language each rung is not allowed to reach for. The policy engine decides how
- * hard we are entitled to push; this stops the model deciding otherwise.
- */
 const RUNG_FORBIDDEN: Record<string, string[]> = {
-  // Nothing failed and nothing is owed, so debt language is simply wrong.
   resume_checkout: [
     "failed", "declined", "unsuccessful", "did not go through", "overdue",
     "past due", "outstanding", "owe", "unpaid", "arrears",
@@ -30,7 +25,6 @@ const RUNG_FORBIDDEN: Record<string, string[]> = {
     "legal", "lawyer", "solicitor", "court", "collection agency", "collections",
     "credit report", "penalty", "late fee", "suspend", "terminate", "final notice",
   ],
-  // Even a formal notice stops short of threatening consequences.
   formal: [
     "legal action", "lawyer", "solicitor", "court", "sue", "collection agency",
     "collections", "credit report", "credit bureau", "penalty", "late fee",
@@ -42,10 +36,6 @@ export const BODY_WORD_MIN = 40;
 export const BODY_WORD_MAX = 160;
 export const SUBJECT_MAX_LENGTH = 78;
 
-/**
- * The canonical rendering of a case amount. Exported so the drafting prompt and
- * the validator can never disagree about what string the body must contain.
- */
 export function formatDraftAmount(amountMinor: number): string {
   return (amountMinor / 100).toFixed(2);
 }
@@ -55,8 +45,6 @@ function wordCount(text: string): number {
 }
 
 function extractUrls(text: string): string[] {
-  // Trailing sentence punctuation is not part of the URL. Without stripping it,
-  // a correctly written "... visit https://x/y." fails the allowlist check.
   return (text.match(/https?:\/\/[^\s"'<>]+/g) ?? []).map((url) => url.replace(/[.,;:!?)\]]+$/, ""));
 }
 

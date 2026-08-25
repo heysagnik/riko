@@ -36,7 +36,7 @@ export const DialogContent = React.forwardRef<
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm text-ink-faint transition-colors duration-150 hover:text-ink focus:outline-none">
+      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm text-ink-faint transition-[color,background-color,transform] duration-150 ease-out hover:bg-surface-sunk hover:text-ink active:scale-[0.96] focus:outline-none">
         <XIcon size={16} weight="regular" />
         <span className="sr-only">Close</span>
       </DialogPrimitive.Close>
