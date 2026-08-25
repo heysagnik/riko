@@ -1,0 +1,9 @@
+name = "riko-keepalive"
+main = "src/index.ts"
+compatibility_date = "2026-08-01"
+
+[triggers]
+crons = ["*/5 * * * *"]
+
+[vars]
+HEALTH_URL = "https://riko.sagnik.fun/health"

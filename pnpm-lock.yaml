@@ -74,6 +74,15 @@ importers:
         specifier: ^4.20.0
         version: 4.125.0(@cloudflare/workers-types@4.20260702.1)
 
+  apps/keepalive-worker:
+    devDependencies:
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      wrangler:
+        specifier: ^4.20.0
+        version: 4.125.0(@cloudflare/workers-types@4.20260702.1)
+
   apps/web:
     dependencies:
       '@blobatar/react':
