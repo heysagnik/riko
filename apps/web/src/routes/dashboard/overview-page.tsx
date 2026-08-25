@@ -12,7 +12,7 @@ import { failureLabel } from "../../lib/labels.js";
 import { cn } from "../../lib/utils.js";
 
 const DECISION_TONE: Record<string, string> = {
-  outreach_email: "bg-recovered",
+  outreach_email: "bg-ink",
   wait_until: "bg-waiting",
   no_action_provider_retrying: "bg-ink-faint",
   escalate_human: "bg-lost",
