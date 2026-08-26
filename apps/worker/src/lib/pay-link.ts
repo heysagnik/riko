@@ -3,16 +3,13 @@ import { db, cases, connections, customers, exposures, organization } from "@rik
 import { createRazorpayPaymentLink, decryptSecret } from "@riko/core";
 
 const LINK_TTL_MS = 30 * 60 * 1000;
-const THROTTLE_RETRY_MS = 3000;
+const THROTTLE_COOLDOWN_MS = 15 * 60 * 1000;
 const cache = new Map<string, { url: string; expires: number }>();
+let throttledUntil = 0;
 
 function isThrottled(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return message.includes("(429)") || /try after sometime/i.test(message);
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export function getCachedPayLink(caseId: string): string | null {
@@ -48,7 +45,7 @@ export async function getOrCreateRazorpayPayLink(caseId: string): Promise<string
     if (!connection || connection.providerId !== "razorpay") return null;
 
     const key = encryptionKey();
-    const params = {
+    const link = await createRazorpayPaymentLink({
       keyId: connection.providerAccountId,
       keySecret: decryptSecret(connection.accessTokenEncrypted, key),
       amountMinor: exposure.amountMinor,
@@ -58,24 +55,18 @@ export async function getOrCreateRazorpayPayLink(caseId: string): Promise<string
       customerEmail: decryptSecret(customer.emailEncrypted, key),
       customerContact: customer.phoneEncrypted ? decryptSecret(customer.phoneEncrypted, key) : null,
       notes: { case_id: caseRow.id, tenant_id: caseRow.tenantId },
-    };
-
-    let link: Awaited<ReturnType<typeof createRazorpayPaymentLink>>;
-    try {
-      link = await createRazorpayPaymentLink(params);
-    } catch (error) {
-      if (!isThrottled(error)) throw error;
-      await sleep(THROTTLE_RETRY_MS);
-      link = await createRazorpayPaymentLink(params);
-    }
+    });
 
     cache.set(caseId, { url: link.shortUrl, expires: Date.now() + LINK_TTL_MS });
     return link.shortUrl;
   } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
     if (isThrottled(error)) {
-      process.stdout.write(`pay-link: throttled for case ${caseId}, falling back to lazy link\n`);
+      throttledUntil = Date.now() + THROTTLE_COOLDOWN_MS;
+      process.stdout.write(
+        `pay-link: razorpay throttled, pausing link creation for ${THROTTLE_COOLDOWN_MS / 60000} minutes\n`,
+      );
     } else {
+      const detail = error instanceof Error ? error.message : String(error);
       process.stderr.write(`pay-link: failed for case ${caseId}: ${detail}\n`);
     }
     return null;
