@@ -1,14 +1,25 @@
 import type { Database } from "@riko/db";
-import { webhookEvents, customers, payments, exposures, cases, failureCodeMap, appendCaseEvent } from "@riko/db";
+import { webhookEvents, customers, payments, exposures, cases, failureCodeMap, appendCaseEvent, agentSettings } from "@riko/db";
 import type { PaymentProvider, ProviderEvent, NormalizedEvent } from "@riko/core";
 import { applyTransition, encryptSecret, fetchRazorpaySubscriptionAmount } from "@riko/core";
+import { agentSettingsSchema, resolveAgentSettings } from "@riko/shared";
 import { eq, and, desc, inArray } from "drizzle-orm";
 import { randomInt } from "node:crypto";
 
-const HOLDOUT_PERCENT = Number(process.env.HOLDOUT_PERCENT ?? 5);
+const ENV_HOLDOUT_PERCENT = Number(process.env.HOLDOUT_PERCENT ?? 5);
 
-function assignArm(): "treatment" | "holdout" {
-  return randomInt(100) < HOLDOUT_PERCENT ? "holdout" : "treatment";
+function assignArm(holdoutPercent: number): "treatment" | "holdout" {
+  return randomInt(100) < holdoutPercent ? "holdout" : "treatment";
+}
+
+async function resolveHoldoutPercent(handleDb: Database, tenantId: string): Promise<number> {
+  const [row] = await handleDb
+    .select({ config: agentSettings.config })
+    .from(agentSettings)
+    .where(eq(agentSettings.tenantId, tenantId))
+    .limit(1);
+  if (!row) return Math.min(50, Math.max(0, ENV_HOLDOUT_PERCENT));
+  return resolveAgentSettings(agentSettingsSchema.parse(row.config ?? {})).holdoutPercent;
 }
 
 export interface WebhookConnectionCandidate {
@@ -259,7 +270,7 @@ async function recordSubscriptionExposure(
 
   const [caseRow] = await db
     .insert(cases)
-    .values({ tenantId, exposureId, customerId, state: "NEW", arm: assignArm() })
+    .values({ tenantId, exposureId, customerId, state: "NEW", arm: assignArm(await resolveHoldoutPercent(db, tenantId)) })
     .returning({ id: cases.id });
 
   await appendCaseEvent(db, {
@@ -346,7 +357,7 @@ async function applyNormalizedEvent(
 
     const [caseRow] = await db
       .insert(cases)
-      .values({ tenantId, exposureId: exposureRow!.id, customerId, state: "NEW", arm: assignArm() })
+      .values({ tenantId, exposureId: exposureRow!.id, customerId, state: "NEW", arm: assignArm(await resolveHoldoutPercent(db, tenantId)) })
       .returning({ id: cases.id });
 
     await appendCaseEvent(db, {

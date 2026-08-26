@@ -1,6 +1,7 @@
 import { and, eq, gte, ne, sql, desc } from "drizzle-orm";
 import { db, cases, customers, exposures, payments, organization, caseEvents } from "@riko/db";
 import type { ReasonPaymentCaseInput } from "@riko/agent";
+import { loadAgentSettings } from "./load-agent-settings.js";
 
 const REPEAT_WINDOW_DAYS = 30;
 
@@ -74,6 +75,7 @@ export async function loadReasonCaseInput(caseId: string, now: Date = new Date()
   const baseUrl = process.env.APP_BASE_URL ?? "https://app.example.com";
   const hoursSinceFailure = Math.max(0, (now.getTime() - row.occurredAt.getTime()) / (60 * 60 * 1000));
   const providerRetry = row.paymentRetryAt ?? row.exposureRetryAt;
+  const settings = await loadAgentSettings(row.tenantId);
 
   return {
     caseId,
@@ -92,6 +94,9 @@ export async function loadReasonCaseInput(caseId: string, now: Date = new Date()
     updatePaymentMethodUrl: `${baseUrl}/pay/${caseId}`,
     unsubscribeUrl: `${baseUrl}/unsubscribe/${row.customerId}`,
     additionalContext: recentNotes || null,
+    merchantGuidance: settings.additionalInstructions || null,
+    tone: settings.tone,
+    highValue: settings.highValueThresholdMinor > 0 && row.amountMinor >= settings.highValueThresholdMinor,
     now,
   };
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluateGates, describePolicyLimits, isWithinContactWindow } from "./evaluate.js";
+import { evaluateGates, describePolicyLimits, isWithinContactWindow, DEFAULT_GATE_LIMITS, gateLimitsFromAgentSettings } from "./evaluate.js";
 import type { GateCaseInput } from "./types.js";
 
 const baseInput: GateCaseInput = {
@@ -86,6 +86,67 @@ describe("evaluateGates", () => {
     expect(isWithinContactWindow(7)).toBe(true);
     expect(isWithinContactWindow(22)).toBe(true);
     expect(isWithinContactWindow(23)).toBe(false);
+  });
+
+  it("honors a tighter attempt cap from tenant settings", () => {
+    const result = evaluateGates({
+      ...baseInput,
+      attemptCount: 1,
+      limits: { ...DEFAULT_GATE_LIMITS, maxAttempts: 1 },
+    });
+    expect(result).toEqual({ eligible: false, reason: "attempts_exhausted" });
+  });
+
+  it("honors a shorter cooldown from tenant settings", () => {
+    const result = evaluateGates({
+      ...baseInput,
+      hoursSinceLastOutreach: 10,
+      limits: { ...DEFAULT_GATE_LIMITS, cooldownHours: 4 },
+    });
+    expect(result).toEqual({ eligible: true, reason: null });
+  });
+
+  it("skips cases below the merchant's minimum amount", () => {
+    const result = evaluateGates({
+      ...baseInput,
+      amountMinor: 9900,
+      limits: { ...DEFAULT_GATE_LIMITS, minAmountMinor: 10000 },
+    });
+    expect(result).toEqual({ eligible: false, reason: "below_min_amount" });
+  });
+
+  it("holds the first email inside the window when the merchant asks for it", () => {
+    const limits = { ...DEFAULT_GATE_LIMITS, firstEmailWithinWindow: true };
+    const result = evaluateGates({ ...baseInput, localHour: 3, limits });
+    expect(result).toEqual({ eligible: false, reason: "outside_contact_window" });
+    expect(evaluateGates({ ...baseInput, localHour: 3 }).eligible).toBe(true);
+  });
+
+  it("maps agent settings onto gate limits", () => {
+    const limits = gateLimitsFromAgentSettings({
+      maxAttempts: 5,
+      cooldownHours: 12,
+      contactWindowStartHour: 9,
+      contactWindowEndHour: 20,
+      firstEmailWithinWindow: true,
+      maxAgeDaysPaymentFailure: 14,
+      maxAgeDaysCheckoutAbandonment: 3,
+      maxAgeDaysOverdueReceivable: 45,
+      minAmountMinor: 50000,
+      highValueThresholdMinor: 100000,
+      holdoutPercent: 10,
+      defaultLanguage: "english",
+      tone: "formal",
+      persistence: "firm",
+      additionalInstructions: "",
+    });
+    expect(limits.maxAttempts).toBe(5);
+    expect(limits.cooldownHours).toBe(12);
+    expect(limits.maxAgeDays.payment_failure).toBe(14);
+    expect(limits.maxAgeDays.overdue_receivable).toBe(45);
+    expect(limits.minAmountMinor).toBe(50000);
+    const result = evaluateGates({ ...baseInput, amountMinor: 150000, paymentAgeDays: 15, limits });
+    expect(result).toEqual({ eligible: false, reason: "payment_too_old" });
   });
 });
 

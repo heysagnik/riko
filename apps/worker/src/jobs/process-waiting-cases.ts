@@ -1,7 +1,8 @@
 import { and, eq, isNull, lte, or } from "drizzle-orm";
 import { db, cases, customers, appendCaseEvent } from "@riko/db";
-import { applyTransition, isWithinContactWindow, MAX_ATTEMPTS } from "@riko/core";
+import { applyTransition, isWithinContactWindow, gateLimitsFromAgentSettings } from "@riko/core";
 import { localHourFor, nextContactWindowOpen } from "../lib/local-day.js";
+import { loadAgentSettings } from "../loaders/load-agent-settings.js";
 
 const BATCH_LIMIT = 200;
 
@@ -26,7 +27,10 @@ export async function processWaitingCases(now: Date = new Date()): Promise<void>
     .limit(BATCH_LIMIT);
 
   for (const caseRow of due) {
-    if (!isWithinContactWindow(localHourFor(caseRow.timezone))) {
+    const settings = await loadAgentSettings(caseRow.tenantId);
+    const limits = gateLimitsFromAgentSettings(settings);
+
+    if (!isWithinContactWindow(localHourFor(caseRow.timezone), limits.contactWindowStartHour, limits.contactWindowEndHour)) {
       const retryAt = nextContactWindowOpen(caseRow.timezone);
       const deferred = await db
         .update(cases)
@@ -53,7 +57,7 @@ export async function processWaitingCases(now: Date = new Date()): Promise<void>
       continue;
     }
 
-    const exhausted = caseRow.attemptCount >= MAX_ATTEMPTS;
+    const exhausted = caseRow.attemptCount >= limits.maxAttempts;
     const transition = applyTransition("WAITING", {
       type: exhausted ? "cooldown_elapsed_exhausted" : "cooldown_elapsed_retry",
     });

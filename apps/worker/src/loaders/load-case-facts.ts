@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db, cases, customers, exposures, payments, organization, outreach } from "@riko/db";
 import type { CaseFacts } from "@riko/shared";
+import { loadAgentSettings } from "./load-agent-settings.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -36,11 +37,15 @@ export async function loadCaseFacts(caseId: string): Promise<CaseFacts> {
         ? rawObj.message
         : null;
 
+  const settings = await loadAgentSettings(caseRow.tenantId);
+  const customerLocale = customer.locale === "hinglish" || customer.locale?.startsWith("hi") ? "hinglish" : customer.locale ? "english" : null;
+  const language = customerLocale ?? (settings.defaultLanguage === "customer_choice" ? "english" : settings.defaultLanguage);
+
   return {
     caseId,
     exposureKind: exposure.kind,
     rung: caseRow.rung,
-    language: customer.locale === "hinglish" || customer.locale?.startsWith("hi") ? "hinglish" : "english",
+    language,
     amountMinor: exposure.amountMinor,
     currency: exposure.currency,
     failureCategory: payment?.failureCategory ?? "unknown",
@@ -53,5 +58,9 @@ export async function loadCaseFacts(caseId: string): Promise<CaseFacts> {
     daysOverdue,
     updatePaymentMethodUrl: `${baseUrl}/pay/${caseId}`,
     unsubscribeUrl: `${baseUrl}/unsubscribe/${customer.id}`,
+    merchantGuidance: settings.additionalInstructions || null,
+    tone: settings.tone,
+    persistence: settings.persistence,
+    highValue: settings.highValueThresholdMinor > 0 && exposure.amountMinor >= settings.highValueThresholdMinor,
   };
 }

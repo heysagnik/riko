@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { eq } from "drizzle-orm";
-import { db, withTenant, senderIdentities } from "@riko/db";
-import { describePolicyLimits } from "@riko/core";
+import { db, withTenant, senderIdentities, agentSettings } from "@riko/db";
+import { describePolicyLimits, gateLimitsFromAgentSettings } from "@riko/core";
+import { agentSettingsSchema, resolveAgentSettings } from "@riko/shared";
 import { requireTenant } from "../middleware/require-tenant.js";
 
 export const policyRouter = Router();
@@ -38,9 +39,15 @@ policyRouter.get("/policy", requireTenant, async (req, res) => {
       .limit(1),
   );
 
+  const [settingsRow] = await withTenant(db, tenantId, (tx) =>
+    tx.select({ config: agentSettings.config }).from(agentSettings).where(eq(agentSettings.tenantId, tenantId)).limit(1),
+  );
+  const resolved = resolveAgentSettings(agentSettingsSchema.parse(settingsRow?.config ?? {}));
+  const limits = gateLimitsFromAgentSettings(resolved);
+
   res.json({
     limits: [
-      ...describePolicyLimits(),
+      ...describePolicyLimits(limits),
       { id: "daily_cap", label: "Emails per day", value: String(sender?.dailySendCap ?? 500), group: "budget" },
     ],
     stoppingRules: STOPPING_RULES,

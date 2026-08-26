@@ -1,7 +1,9 @@
 import { eq, and, desc, gte, isNotNull, sql } from "drizzle-orm";
 import { db, cases, customers, connections, senderIdentities, exposures, payments, outreach } from "@riko/db";
 import type { GateCaseInput } from "@riko/core";
+import { gateLimitsFromAgentSettings } from "@riko/core";
 import { localHourFor, startOfLocalDay } from "../lib/local-day.js";
+import { loadAgentSettings } from "./load-agent-settings.js";
 
 export async function loadGateInput(caseId: string): Promise<GateCaseInput> {
   const [caseRow] = await db.select().from(cases).where(eq(cases.id, caseId)).limit(1);
@@ -54,6 +56,8 @@ export async function loadGateInput(caseId: string): Promise<GateCaseInput> {
     ? (Date.now() - lastOutreach.sentAt.getTime()) / (1000 * 60 * 60)
     : null;
 
+  const settings = await loadAgentSettings(caseRow.tenantId);
+
   return {
     exposureKind: exposure.kind,
     customerSuppressed: Boolean(customer.suppressedAt),
@@ -69,5 +73,7 @@ export async function loadGateInput(caseId: string): Promise<GateCaseInput> {
     paymentAgeDays,
     tenantPaused: sender?.outreachPaused ?? false,
     tenantWithinDailySendCap: (sentToday[0]?.count ?? 0) < dailyCap,
+    amountMinor: exposure.amountMinor,
+    limits: gateLimitsFromAgentSettings(settings),
   };
 }

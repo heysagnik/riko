@@ -1,8 +1,14 @@
 import { Router } from "express";
 import { eq } from "drizzle-orm";
-import { db, withTenant, senderIdentities } from "@riko/db";
+import { db, withTenant, senderIdentities, agentSettings } from "@riko/db";
 import { encryptSecret, validateBrandTemplate } from "@riko/core";
-import { senderIdentityUpsertSchema, outreachSettingsPatchSchema } from "@riko/shared";
+import {
+  senderIdentityUpsertSchema,
+  outreachSettingsPatchSchema,
+  agentSettingsInputSchema,
+  agentSettingsSchema,
+  resolveAgentSettings,
+} from "@riko/shared";
 import { requireTenant } from "../middleware/require-tenant.js";
 
 export const settingsRouter = Router();
@@ -14,6 +20,29 @@ function requireEncryptionKey(): string {
   }
   return key;
 }
+
+settingsRouter.get("/settings/agent", requireTenant, async (req, res) => {
+  const tenantId = req.tenant!.tenantId;
+
+  const [row] = await withTenant(db, tenantId, (tx) =>
+    tx.select().from(agentSettings).where(eq(agentSettings.tenantId, tenantId)).limit(1),
+  );
+
+  const patch = agentSettingsSchema.parse(row?.config ?? {});
+  res.json({ agentSettings: resolveAgentSettings(patch) });
+});
+
+settingsRouter.put("/settings/agent", requireTenant, async (req, res) => {
+  const tenantId = req.tenant!.tenantId;
+  const body = agentSettingsInputSchema.parse(req.body);
+
+  const values = { tenantId, config: body, updatedAt: new Date() };
+  await withTenant(db, tenantId, (tx) =>
+    tx.insert(agentSettings).values(values).onConflictDoUpdate({ target: agentSettings.tenantId, set: values }),
+  );
+
+  res.json({ ok: true });
+});
 
 settingsRouter.get("/settings/sender-identity", requireTenant, async (req, res) => {
   const tenantId = req.tenant!.tenantId;

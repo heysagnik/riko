@@ -1,4 +1,5 @@
 import type { ExposureKind } from "./case.js";
+import type { AgentPersistence, AgentTone } from "../schemas/agent-settings.js";
 
 export type DraftLanguage = "english" | "hinglish";
 
@@ -19,6 +20,10 @@ export interface CaseFacts {
   daysOverdue: number | null;
   updatePaymentMethodUrl: string;
   unsubscribeUrl: string;
+  merchantGuidance?: string | null;
+  tone?: AgentTone | null;
+  persistence?: AgentPersistence | null;
+  highValue?: boolean | null;
 }
 
 export interface EmailDraft {

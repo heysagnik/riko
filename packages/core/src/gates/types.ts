@@ -1,5 +1,15 @@
 import type { ExposureKind, FailureCategory } from "@riko/shared";
 
+export interface GateLimits {
+  maxAttempts: number;
+  cooldownHours: number;
+  contactWindowStartHour: number;
+  contactWindowEndHour: number;
+  firstEmailWithinWindow: boolean;
+  maxAgeDays: Record<ExposureKind, number>;
+  minAmountMinor: number;
+}
+
 export interface GateCaseInput {
   exposureKind: ExposureKind;
   customerHasDeliverableEmail: boolean;
@@ -15,6 +25,8 @@ export interface GateCaseInput {
   paymentAgeDays: number;
   tenantPaused: boolean;
   tenantWithinDailySendCap: boolean;
+  amountMinor?: number | null;
+  limits?: GateLimits;
 }
 
 export type GateFailureReason =
@@ -27,7 +39,8 @@ export type GateFailureReason =
   | "payment_too_old"
   | "customer_suppressed"
   | "outside_contact_window"
-  | "tenant_paused_or_capped";
+  | "tenant_paused_or_capped"
+  | "below_min_amount";
 
 export interface GateResult {
   eligible: boolean;

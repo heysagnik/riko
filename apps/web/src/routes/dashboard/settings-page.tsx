@@ -6,11 +6,13 @@ import {
   DEFAULT_BRAND_TEMPLATE,
 } from "@riko/core/outreach/brand-template";
 import { Button } from "../../components/ui/button.js";
+import { Select } from "../../components/ui/select.js";
 import { Skeleton } from "../../components/ui/skeleton.js";
 import { Switch } from "../../components/ui/switch.js";
 import { Tabs, TabsList, TabsTrigger } from "../../components/ui/tabs.js";
 import { useSaveSenderIdentity, useSenderIdentity } from "../../hooks/use-sender-identity.js";
 import { useSaveOutreachSettings } from "../../hooks/use-outreach-settings.js";
+import { useAgentSettings, useSaveAgentSettings, type AgentSettings } from "../../hooks/use-agent-settings.js";
 import { useTheme, type ResolvedTheme } from "../../lib/theme.js";
 import { cn } from "../../lib/utils.js";
 
@@ -125,6 +127,7 @@ function buildPreview(template: string, merchantName: string, resolvedTheme: Res
 
 const SECTIONS = [
   { id: "sender-identity", label: "Sender identity" },
+  { id: "agent", label: "Agent" },
   { id: "smtp", label: "SMTP" },
   { id: "brand-template", label: "Brand template" },
   { id: "alerts", label: "Alerts" },
@@ -132,10 +135,39 @@ const SECTIONS = [
   { id: "pause-outreach", label: "Pause outreach" },
 ];
 
+type AgentForm = {
+  maxAttempts: string;
+  cooldownHours: string;
+  windowStart: string;
+  windowEnd: string;
+  firstEmailWithinWindow: boolean;
+  agePayment: string;
+  ageAbandonment: string;
+  ageReceivable: string;
+  minAmount: string;
+  highValue: string;
+  holdout: string;
+  defaultLanguage: AgentSettings["defaultLanguage"];
+  tone: AgentSettings["tone"];
+  persistence: AgentSettings["persistence"];
+  additionalInstructions: string;
+};
+
+const GUARDRAILS = [
+  { label: "Fraud-flagged cases are never contacted", detail: "A compromised card is never chased, regardless of any setting on this page." },
+  { label: "No discounts, credits, or deadlines", detail: "Riko never offers the customer anything. Only you can." },
+  { label: "Disputes go to a person", detail: "A chargeback signal always escalates instead of another email." },
+  { label: "Merchant-config faults escalate", detail: "Failures caused by your own gateway settings go to you, not the customer, until approved." },
+  { label: "Unsubscribe is honored instantly", detail: "One click closes every open case for that customer." },
+  { label: "Exactly one payment link", detail: "Every email carries your payment page and nothing else." },
+];
+
 export function SettingsPage() {
   const { data, isLoading } = useSenderIdentity();
   const save = useSaveSenderIdentity();
   const saveCap = useSaveOutreachSettings();
+  const { data: agentData } = useAgentSettings();
+  const saveAgent = useSaveAgentSettings();
   const identity = data?.senderIdentity ?? undefined;
   const { resolvedTheme } = useTheme();
 
@@ -154,6 +186,32 @@ export function SettingsPage() {
   const [dailySendCap, setDailySendCap] = useState("500");
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+
+  const [agentForm, setAgentForm] = useState<AgentForm | null>(null);
+  const [agentError, setAgentError] = useState<string | null>(null);
+  const [agentSaved, setAgentSaved] = useState(false);
+
+  useEffect(() => {
+    if (!agentData) return;
+    const s = agentData.agentSettings;
+    setAgentForm({
+      maxAttempts: String(s.maxAttempts),
+      cooldownHours: String(s.cooldownHours),
+      windowStart: String(s.contactWindowStartHour),
+      windowEnd: String(s.contactWindowEndHour),
+      firstEmailWithinWindow: s.firstEmailWithinWindow,
+      agePayment: String(s.maxAgeDaysPaymentFailure),
+      ageAbandonment: String(s.maxAgeDaysCheckoutAbandonment),
+      ageReceivable: String(s.maxAgeDaysOverdueReceivable),
+      minAmount: String(s.minAmountMinor / 100),
+      highValue: String(s.highValueThresholdMinor / 100),
+      holdout: String(s.holdoutPercent),
+      defaultLanguage: s.defaultLanguage,
+      tone: s.tone,
+      persistence: s.persistence,
+      additionalInstructions: s.additionalInstructions,
+    });
+  }, [agentData]);
 
   useEffect(() => {
     const identity = data?.senderIdentity;
@@ -530,6 +588,228 @@ export function SettingsPage() {
                 />
               </div>
             </section>
+          ) : null}
+
+          {activeSection === "agent" && agentForm ? (
+            <div>
+              <h2 className="text-subtitle text-ink">Agent behavior</h2>
+              <p className="mt-1 max-w-lg text-sm text-ink-muted">
+                Every bound Riko reasons within. These are enforced by deterministic code after the model decides,
+                and reflected live on the "What Riko may do" page.
+              </p>
+
+              <section className="mt-8">
+                <h3 className="text-label uppercase text-ink-muted">Cadence</h3>
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <label className="block text-sm">
+                    <span className="text-label uppercase text-ink-muted">Emails per case (max)</span>
+                    <input type="number" min={1} max={6} className={inputClass} value={agentForm.maxAttempts}
+                      onChange={(e) => setAgentForm({ ...agentForm, maxAttempts: e.target.value })} />
+                  </label>
+                  <label className="block text-sm">
+                    <span className="text-label uppercase text-ink-muted">Minimum gap between emails (hours)</span>
+                    <input type="number" min={1} max={168} className={inputClass} value={agentForm.cooldownHours}
+                      onChange={(e) => setAgentForm({ ...agentForm, cooldownHours: e.target.value })} />
+                  </label>
+                  <label className="block text-sm">
+                    <span className="text-label uppercase text-ink-muted">Stop chasing failed payments after (days)</span>
+                    <input type="number" min={1} max={90} className={inputClass} value={agentForm.agePayment}
+                      onChange={(e) => setAgentForm({ ...agentForm, agePayment: e.target.value })} />
+                  </label>
+                  <label className="block text-sm">
+                    <span className="text-label uppercase text-ink-muted">Stop chasing abandoned checkouts after (days)</span>
+                    <input type="number" min={1} max={60} className={inputClass} value={agentForm.ageAbandonment}
+                      onChange={(e) => setAgentForm({ ...agentForm, ageAbandonment: e.target.value })} />
+                  </label>
+                  <label className="block text-sm">
+                    <span className="text-label uppercase text-ink-muted">Hand unpaid invoices to a person after (days)</span>
+                    <input type="number" min={1} max={120} className={inputClass} value={agentForm.ageReceivable}
+                      onChange={(e) => setAgentForm({ ...agentForm, ageReceivable: e.target.value })} />
+                  </label>
+                </div>
+              </section>
+
+              <section className="mt-8">
+                <h3 className="text-label uppercase text-ink-muted">Contact window</h3>
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <label className="block text-sm">
+                    <span className="text-label uppercase text-ink-muted">Window start (customer local hour)</span>
+                    <input type="number" min={0} max={23} className={inputClass} value={agentForm.windowStart}
+                      onChange={(e) => setAgentForm({ ...agentForm, windowStart: e.target.value })} />
+                  </label>
+                  <label className="block text-sm">
+                    <span className="text-label uppercase text-ink-muted">Window end (customer local hour)</span>
+                    <input type="number" min={1} max={24} className={inputClass} value={agentForm.windowEnd}
+                      onChange={(e) => setAgentForm({ ...agentForm, windowEnd: e.target.value })} />
+                  </label>
+                </div>
+                <label className="mt-3 flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={agentForm.firstEmailWithinWindow}
+                    onChange={(e) => setAgentForm({ ...agentForm, firstEmailWithinWindow: e.target.checked })}
+                    className="h-4 w-4 rounded border-line-strong" />
+                  <span className="text-ink-muted">Hold even the first email inside the window (off = first email goes any time)</span>
+                </label>
+              </section>
+
+              <section className="mt-8">
+                <h3 className="text-label uppercase text-ink-muted">Money rules</h3>
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <label className="block text-sm">
+                    <span className="text-label uppercase text-ink-muted">Skip cases below (₹, 0 = chase everything)</span>
+                    <input type="number" min={0} className={inputClass} value={agentForm.minAmount}
+                      onChange={(e) => setAgentForm({ ...agentForm, minAmount: e.target.value })} />
+                  </label>
+                  <label className="block text-sm">
+                    <span className="text-label uppercase text-ink-muted">High-value threshold (₹)</span>
+                    <input type="number" min={0} className={inputClass} value={agentForm.highValue}
+                      onChange={(e) => setAgentForm({ ...agentForm, highValue: e.target.value })} />
+                  </label>
+                </div>
+                <p className="mt-2 text-caption text-ink-faint">
+                  Cases at or above the high-value threshold make the agent extra careful and precise with amounts and links.
+                </p>
+              </section>
+
+              <section className="mt-8">
+                <h3 className="text-label uppercase text-ink-muted">Voice</h3>
+                <div className="mt-3 grid grid-cols-3 gap-3">
+                  <div>
+                    <span className="text-label uppercase text-ink-muted">Language default</span>
+                    <div className="mt-1">
+                      <Select
+                        value={agentForm.defaultLanguage}
+                        onValueChange={(v) => setAgentForm({ ...agentForm, defaultLanguage: v as AgentSettings["defaultLanguage"] })}
+                        options={[
+                          { value: "customer_choice", label: "Follow each customer", hint: "Whatever this customer prefers" },
+                          { value: "english", label: "English", hint: "For every customer" },
+                          { value: "hinglish", label: "Hinglish", hint: "Roman-script Hindi + English" },
+                        ]}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-label uppercase text-ink-muted">Tone</span>
+                    <div className="mt-1">
+                      <Select
+                        value={agentForm.tone}
+                        onValueChange={(v) => setAgentForm({ ...agentForm, tone: v as AgentSettings["tone"] })}
+                        options={[
+                          { value: "friendly", label: "Friendly", hint: "Warm and human" },
+                          { value: "neutral", label: "Neutral", hint: "Professional and plain" },
+                          { value: "formal", label: "Formal", hint: "Matter of record" },
+                        ]}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-label uppercase text-ink-muted">Persistence</span>
+                    <div className="mt-1">
+                      <Select
+                        value={agentForm.persistence}
+                        onValueChange={(v) => setAgentForm({ ...agentForm, persistence: v as AgentSettings["persistence"] })}
+                        options={[
+                          { value: "gentle", label: "Gentle", hint: "Easy to say yes to" },
+                          { value: "balanced", label: "Balanced", hint: "Standard escalation" },
+                          { value: "firm", label: "Firm", hint: "Direct urgency where allowed" },
+                        ]}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <p className="mt-2 text-caption text-ink-faint">
+                  Language default applies to customers whose own preference is unknown; a customer's choice always wins.
+                </p>
+              </section>
+
+              <section className="mt-8">
+                <h3 className="text-label uppercase text-ink-muted">Measurement</h3>
+                <div className="mt-3 max-w-xs">
+                  <label className="block text-sm">
+                    <span className="text-label uppercase text-ink-muted">Holdout (% of new cases left alone)</span>
+                    <input type="number" min={0} max={50} className={inputClass} value={agentForm.holdout}
+                      onChange={(e) => setAgentForm({ ...agentForm, holdout: e.target.value })} />
+                  </label>
+                  <p className="mt-2 text-caption text-ink-faint">
+                    Holdout cases prove how much money Riko actually recovers versus what would have come back anyway. Keep it above zero if you want honest numbers.
+                  </p>
+                </div>
+              </section>
+
+              <section className="mt-8">
+                <h3 className="text-label uppercase text-ink-muted">Additional instructions</h3>
+                <p className="mt-1 text-sm text-ink-muted">
+                  Standing guidance the agent reads on every case. It shapes wording and emphasis; it can never
+                  override the guardrails below.
+                </p>
+                <textarea
+                  rows={6}
+                  maxLength={2000}
+                  placeholder={"e.g. We are a small studio - keep emails personal and never mention the word invoice. For orders above Rs 10,000 mention that we can split payment into two parts if they reply to this email."}
+                  className={cn(inputClass, "mt-3 resize-y")}
+                  value={agentForm.additionalInstructions}
+                  onChange={(e) => setAgentForm({ ...agentForm, additionalInstructions: e.target.value })}
+                />
+                <p className="mt-1 text-caption text-ink-faint">{agentForm.additionalInstructions.length}/2000</p>
+              </section>
+
+              <section className="mt-8">
+                <h3 className="text-label uppercase text-ink-muted">Fixed guardrails</h3>
+                <ul className="mt-3 divide-y divide-line border-y border-line">
+                  {GUARDRAILS.map((g) => (
+                    <li key={g.label} className="py-2.5">
+                      <p className="text-sm text-ink">{g.label}</p>
+                      <p className="mt-0.5 text-caption text-ink-muted">{g.detail}</p>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+
+              {agentError ? (
+                <p className="mt-6 rounded-sm border border-lost/30 bg-lost/10 px-3 py-2 text-sm text-lost" role="alert">
+                  {agentError}
+                </p>
+              ) : null}
+              {agentSaved ? (
+                <p className="mt-6 text-sm text-recovered animate-in fade-in-0 slide-in-from-top-1 duration-150 ease-out" role="status">
+                  Saved. New limits apply from the next agent run.
+                </p>
+              ) : null}
+
+              <div className="mt-8">
+                <Button
+                  disabled={saveAgent.isPending}
+                  onClick={async () => {
+                    if (!agentForm) return;
+                    setAgentError(null);
+                    setAgentSaved(false);
+                    try {
+                      await saveAgent.mutateAsync({
+                        maxAttempts: Number(agentForm.maxAttempts),
+                        cooldownHours: Number(agentForm.cooldownHours),
+                        contactWindowStartHour: Number(agentForm.windowStart),
+                        contactWindowEndHour: Number(agentForm.windowEnd),
+                        firstEmailWithinWindow: agentForm.firstEmailWithinWindow,
+                        maxAgeDaysPaymentFailure: Number(agentForm.agePayment),
+                        maxAgeDaysCheckoutAbandonment: Number(agentForm.ageAbandonment),
+                        maxAgeDaysOverdueReceivable: Number(agentForm.ageReceivable),
+                        minAmountMinor: Math.round(Number(agentForm.minAmount) * 100),
+                        highValueThresholdMinor: Math.round(Number(agentForm.highValue) * 100),
+                        holdoutPercent: Number(agentForm.holdout),
+                        defaultLanguage: agentForm.defaultLanguage,
+                        tone: agentForm.tone,
+                        persistence: agentForm.persistence,
+                        additionalInstructions: agentForm.additionalInstructions,
+                      });
+                      setAgentSaved(true);
+                    } catch (err) {
+                      setAgentError(err instanceof Error ? err.message : "Could not save agent settings.");
+                    }
+                  }}
+                >
+                  {saveAgent.isPending ? "Saving…" : "Save agent settings"}
+                </Button>
+              </div>
+            </div>
           ) : null}
         </div>
       </div>

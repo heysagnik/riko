@@ -3,11 +3,10 @@ import { randomInt } from "node:crypto";
 import { db, cases, exposures, payments, appendCaseEvent } from "@riko/db";
 import { ABANDONMENT_SWEEP_MINUTES } from "@riko/core";
 import { log } from "../lib/logger.js";
+import { loadAgentSettings } from "../loaders/load-agent-settings.js";
 
-const HOLDOUT_PERCENT = Number(process.env.HOLDOUT_PERCENT ?? 5);
-
-function assignArm(): "treatment" | "holdout" {
-  return randomInt(100) < HOLDOUT_PERCENT ? "holdout" : "treatment";
+function assignArm(holdoutPercent: number): "treatment" | "holdout" {
+  return randomInt(100) < holdoutPercent ? "holdout" : "treatment";
 }
 
 export async function processExposureSweep(now: Date = new Date()): Promise<number> {
@@ -38,6 +37,15 @@ export async function processExposureSweep(now: Date = new Date()): Promise<numb
     .limit(200);
 
   let opened = 0;
+  const holdoutCache = new Map<string, number>();
+
+  const holdoutFor = async (tenantId: string): Promise<number> => {
+    const cached = holdoutCache.get(tenantId);
+    if (cached !== undefined) return cached;
+    const settings = await loadAgentSettings(tenantId);
+    holdoutCache.set(tenantId, settings.holdoutPercent);
+    return settings.holdoutPercent;
+  };
 
   for (const exposure of due) {
     if (exposure.kind === "checkout_abandonment") {
@@ -70,7 +78,7 @@ export async function processExposureSweep(now: Date = new Date()): Promise<numb
             exposureId: exposure.id,
             customerId: exposure.customerId,
             state: "NEW",
-            arm: assignArm(),
+            arm: assignArm(await holdoutFor(exposure.tenantId)),
           })
           .returning({ id: cases.id });
 
