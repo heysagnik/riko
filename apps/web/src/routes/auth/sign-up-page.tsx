@@ -24,6 +24,7 @@ export function SignUpPage() {
       setError(signUpError.message ?? "Could not create your account.");
       return;
     }
+    await authClient.getSession().catch(() => null);
     navigate("/dashboard");
   };
 

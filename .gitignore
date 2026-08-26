@@ -27,3 +27,5 @@ packages/agent/scripts/
 
 # One-off local script that decrypts values straight out of .env
 scripts/test-smtp-send.mjs
+
+~$*

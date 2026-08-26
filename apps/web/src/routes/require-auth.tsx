@@ -14,12 +14,21 @@ function slugify(value: string): string {
 
 export function RequireAuth() {
   const location = useLocation();
-  const { data: session, isPending: sessionPending } = authClient.useSession();
+  const { data: session, isPending: sessionPending, refetch: refetchSession } = authClient.useSession();
   const { data: organizations, isPending: orgsPending } = authClient.useListOrganizations();
   const [isActivating, setIsActivating] = useState(false);
+  const [revalidated, setRevalidated] = useState(false);
 
   const activeOrganizationId = session?.session.activeOrganizationId ?? null;
   const hasOrganizations = (organizations?.length ?? 0) > 0;
+
+  useEffect(() => {
+    if (session || sessionPending || revalidated) {
+      return;
+    }
+    setRevalidated(true);
+    void refetchSession();
+  }, [session, sessionPending, revalidated, refetchSession]);
 
   useEffect(() => {
     if (!session || sessionPending || orgsPending || activeOrganizationId) {
@@ -53,6 +62,13 @@ export function RequireAuth() {
   }
 
   if (!session) {
+    if (!revalidated) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-surface">
+          <Skeleton className="h-8 w-32" />
+        </div>
+      );
+    }
     return <Navigate to="/sign-in" state={{ from: location }} replace />;
   }
 

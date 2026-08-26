@@ -23,6 +23,7 @@ export function SignInPage() {
       setError(signInError.message ?? "Could not sign in with those credentials.");
       return;
     }
+    await authClient.getSession().catch(() => null);
     navigate("/dashboard");
   };
 
