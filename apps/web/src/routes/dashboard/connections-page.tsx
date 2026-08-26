@@ -73,7 +73,7 @@ export function ConnectionsPage() {
 
   return (
     <div>
-      <h1 className="text-title text-ink">Connections</h1>
+      <h1 className="text-title text-ink">Providers</h1>
       <p className="mt-1 text-sm text-ink-muted">Read-only access. We never move money.</p>
 
       {isLoading ? (

@@ -60,6 +60,7 @@ settingsRouter.get("/settings/sender-identity", requireTenant, async (req, res) 
     senderIdentity: {
       fromName: identity.fromName,
       fromEmail: identity.fromEmail,
+      phone: identity.phone,
       replyTo: identity.replyTo,
       smtpHost: identity.smtpHost,
       smtpPort: identity.smtpPort,
@@ -106,8 +107,9 @@ settingsRouter.put("/settings/sender-identity", requireTenant, async (req, res) 
     tx.select().from(senderIdentities).where(eq(senderIdentities.tenantId, tenantId)).limit(1),
   );
 
-  if (!body.smtpPassword && !existing?.smtpPasswordEncrypted) {
-    res.status(400).json({ error: "smtpPassword is required the first time you configure sending" });
+  const wantsSmtp = body.smtpHost !== undefined || body.smtpUser !== undefined || body.smtpPassword !== undefined;
+  if (wantsSmtp && (!body.smtpHost || !body.smtpUser || (!body.smtpPassword && !existing?.smtpPasswordEncrypted))) {
+    res.status(400).json({ error: "SMTP host, username, and password are required to configure sending" });
     return;
   }
 
@@ -121,17 +123,18 @@ settingsRouter.put("/settings/sender-identity", requireTenant, async (req, res) 
 
   const smtpPasswordEncrypted = body.smtpPassword
     ? encryptSecret(body.smtpPassword, requireEncryptionKey())
-    : existing!.smtpPasswordEncrypted;
+    : (existing?.smtpPasswordEncrypted ?? null);
 
   const values = {
     tenantId,
     fromName: body.fromName,
     fromEmail: body.fromEmail,
+    phone: body.phone || null,
     replyTo: body.replyTo || null,
-    smtpHost: body.smtpHost,
-    smtpPort: body.smtpPort,
-    smtpSecure: body.smtpSecure,
-    smtpUser: body.smtpUser,
+    smtpHost: body.smtpHost ?? existing?.smtpHost ?? null,
+    smtpPort: body.smtpPort ?? existing?.smtpPort ?? null,
+    smtpSecure: body.smtpSecure ?? existing?.smtpSecure ?? false,
+    smtpUser: body.smtpUser ?? existing?.smtpUser ?? null,
     smtpPasswordEncrypted,
     brandTemplateHtml: body.brandTemplateHtml || null,
     addressLine: body.addressLine || null,

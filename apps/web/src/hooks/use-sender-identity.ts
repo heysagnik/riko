@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 export interface SenderIdentity {
   fromName: string;
   fromEmail: string;
+  phone: string | null;
   replyTo: string | null;
   smtpHost: string | null;
   smtpPort: number | null;
@@ -19,11 +20,12 @@ export interface SenderIdentity {
 export interface SenderIdentityInput {
   fromName: string;
   fromEmail: string;
+  phone?: string | undefined;
   replyTo?: string | undefined;
-  smtpHost: string;
-  smtpPort: number;
-  smtpSecure: boolean;
-  smtpUser: string;
+  smtpHost?: string | undefined;
+  smtpPort?: number | undefined;
+  smtpSecure?: boolean | undefined;
+  smtpUser?: string | undefined;
   smtpPassword?: string | undefined;
   brandTemplateHtml?: string | undefined;
   addressLine?: string | undefined;

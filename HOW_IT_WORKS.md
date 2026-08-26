@@ -1,6 +1,6 @@
 # How Riko Works
 
-Riko is an autonomous revenue recovery engine. It detects payment failures, abandoned checkouts, and overdue receivables, decides whether and when to act, and runs bounded email outreach to recover funds.
+Riko is an autonomous revenue recovery engine. It detects payment failures, abandoned checkouts, and overdue receivables, decides whether and when to act, and runs bounded email outreach to recover funds. The merchant sets the bounds — the agent works inside them, and code makes sure it stays that way.
 
 ---
 
@@ -33,7 +33,7 @@ flowchart LR
         direction TB
         API["apps/api\n• Express REST API & Webhooks\n• HMAC Signature Verification\n• Inbound Mail Receiver\n• Better Auth Sessions"]:::appNode
         WORKER["apps/worker\n• Recovery Daemon Loop\n• Postgres Advisory Lock\n• 10 Sequenced Job Pipelines\n• Nodemailer SMTP Dispatch"]:::appNode
-        WEB["apps/web\n• React 18 + Vite + Tailwind\n• Case Inspector & Action Log\n• Escalations Management\n• Holdout Lift Visualizer"]:::appNode
+        WEB["apps/web\n• React 19 + Vite + Tailwind\n• Case Inspector & Action Log\n• Agent Settings & Connectors\n• Guided Onboarding Modal\n• Holdout Lift Visualizer"]:::appNode
         EMAIL_W["apps/email-worker\n• Cloudflare Worker\n• Streamed PostalMime Parser\n• Inbound Webhook Dispatcher"]:::appNode
     end
 
@@ -86,7 +86,7 @@ Cases move through a finite state machine enforced by [`packages/core/src/cases/
 
 ## 5. Send Gates & Policy Engine
 
-Before any draft is generated, [`packages/core/src/gates/evaluate.ts`](./packages/core/src/gates/evaluate.ts) executes hard safety checks:
+Before any draft is generated, [`packages/core/src/gates/evaluate.ts`](./packages/core/src/gates/evaluate.ts) executes hard safety checks. The numbers below are per-tenant defaults — attempt caps, cooldowns, contact window, age limits, and a minimum-amount floor are all editable under Settings → Agent, and the gate code enforces whatever the merchant set with the same rigidity:
 
 ```mermaid
 flowchart TD
@@ -136,6 +136,8 @@ flowchart TD
 ---
 
 ## 6. AI Reasoning, Drafting & AST Validation
+
+The merchant shapes the voice; the validator keeps the promises. Tone and persistence preferences, high-value flags, and standing written guidance are injected into the prompt as advisory context — sanitized of markup and explicitly subordinate to the rules — while the validation barrier below stays identical no matter what a merchant writes.
 
 ```mermaid
 flowchart TD

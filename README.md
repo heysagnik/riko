@@ -1,19 +1,21 @@
 # Riko
 
-> **An autonomous, deterministic revenue recovery engine for failed payments, abandoned checkouts, and overdue invoices.**
+> **An autonomous revenue-recovery engine for failed payments, abandoned checkouts, and overdue invoices — with guardrails the merchant controls.**
 
-Riko decouples recovery policy from message generation: a deterministic policy engine establishes the safety bounds, while a reasoning model drafts within them, enforced by post-generation AST and regex validators.
+Riko separates judgment from obedience. A reasoning model decides what to say and when; a deterministic policy engine decides what is *allowed*. Every draft passes an AST and regex validation barrier before a single email leaves, and every bound the agent runs within is merchant-configurable — enforced in code, not in prompt hope.
 
 ---
 
 ## Highlights
 
-- **Deterministic bounds**: Hard gates for contact windows (07:00–23:00 local customer time), max 3 attempts per case, strict 48h cooldowns, verified senders, and daily send caps.
-- **AST/regex draft validation**: Every draft is validated against exact amounts, customer names, and zero-tolerance blocklists (no unauthorized discounts, waivers, or fake deadlines).
+- **Merchant-tunable agent**: Cadence, contact windows, money rules (minimum chase amounts, high-value thresholds), tone, persistence, language, and standing instructions — all editable in Settings → Agent, all enforced by deterministic code *after* the model decides.
+- **Guided onboarding**: One modal connects Razorpay, sets up your mail service, and introduces the agent. No forms archaeology.
+- **Deterministic safety gates**: Contact windows in the customer's local time, attempt caps, cooldowns, verified senders, daily send caps, and a minimum-amount floor — eleven hard gates before any draft is generated.
+- **AST/regex draft validation**: Every draft is validated against exact amounts, customer names, and zero-tolerance blocklists (no unauthorized discounts, waivers, or invented deadlines). Three strikes and the case goes to a human.
 - **Conversational two-way email**: Autonomous inbound reply classification, quote stripping, context-aware answers, and sentiment escalation.
-- **Promise-to-pay intelligence**: Extracts payment commitments (e.g. *"I'll clear this Friday noon"*), pauses outreach until due, and tracks settlement.
-- **Scientific holdout control groups**: Randomized holdout groups (default 5–25%) prove incremental recovery lift over natural self-healing.
-- **Tamper-evident audit ledger**: SHA-256 cryptographic hash-chains log every state transition and LLM interaction.
+- **Promise-to-pay intelligence**: Extracts payment commitments (*"I'll clear this Friday noon"*), pauses outreach until due, tracks settlement, and resumes the ladder when a promise breaks.
+- **Scientific holdout control groups**: A randomized holdout (merchant-configurable, default 5%) proves incremental recovery lift over natural self-healing — so the recovery number is honest.
+- **Tamper-evident audit ledger**: SHA-256 hash-chains log every state transition and LLM interaction. Manual database edits break the chain, visibly.
 - **Multi-tenant security**: Row-level isolation with AES-256-GCM encryption for all customer PII.
 
 ---
@@ -32,6 +34,7 @@ Riko decouples recovery policy from message generation: a deterministic policy e
 | [`apps/worker`](./apps/worker) | 10-stage background recovery loop running on PostgreSQL advisory locks |
 | [`apps/web`](./apps/web) | React + Vite merchant dashboard and real-time case inspector |
 | [`apps/email-worker`](./apps/email-worker) | Cloudflare Worker parsing inbound MIME email streams |
+| [`apps/keepalive-worker`](./apps/keepalive-worker) | Cloudflare Cron Worker pinging `/health` to keep free-tier hosts warm |
 | [`packages/core`](./packages/core) | Finite state machine, send gates, policy routing, and provider adapters |
 | [`packages/agent`](./packages/agent) | Reasoning engine, drafting loop, rule validators, and scoring |
 | [`packages/db`](./packages/db) | Drizzle schema, tenant isolation helpers, and cryptographic audit ledger |
@@ -89,6 +92,8 @@ pnpm dev
 
 - Dashboard: `http://localhost:5173`
 - API Server: `http://localhost:4000`
+
+Sign up and the dashboard walks you through the rest: connect Razorpay, point it at your mail server, and meet your agent.
 
 ---
 

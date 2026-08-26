@@ -26,6 +26,7 @@ export const senderIdentities = pgTable(
     fromEmail: text("from_email").notNull(),
     fromName: text("from_name").notNull(),
     replyTo: text("reply_to"),
+    phone: text("phone"),
     domainVerified: boolean("domain_verified").notNull().default(false),
     providerDomainId: text("provider_domain_id"),
     smtpHost: text("smtp_host"),

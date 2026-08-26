@@ -4,9 +4,7 @@ import { UnsubscribePage } from "./routes/public/unsubscribe-page.js";
 import { PayPage } from "./routes/public/pay-page.js";
 import { SignInPage } from "./routes/auth/sign-in-page.js";
 import { SignUpPage } from "./routes/auth/sign-up-page.js";
-import { OnboardingPage } from "./routes/auth/onboarding-page.js";
 import { RequireAuth } from "./routes/require-auth.js";
-import { RequireSession } from "./routes/require-session.js";
 import { DashboardLayout } from "./routes/dashboard/dashboard-layout.js";
 import { OverviewPage } from "./routes/dashboard/overview-page.js";
 import { CaseListPage } from "./routes/dashboard/case-list-page.js";
@@ -21,11 +19,6 @@ export const router = createBrowserRouter([
   { path: "/pay/:caseId", element: <PayPage /> },
   { path: "/sign-in", element: <SignInPage /> },
   { path: "/sign-up", element: <SignUpPage /> },
-  {
-    path: "/onboarding",
-    element: <RequireSession />,
-    children: [{ index: true, element: <OnboardingPage /> }],
-  },
   {
     path: "/dashboard",
     element: <RequireAuth />,

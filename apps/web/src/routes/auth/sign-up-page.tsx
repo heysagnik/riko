@@ -24,7 +24,7 @@ export function SignUpPage() {
       setError(signUpError.message ?? "Could not create your account.");
       return;
     }
-    navigate("/onboarding");
+    navigate("/dashboard");
   };
 
   return (

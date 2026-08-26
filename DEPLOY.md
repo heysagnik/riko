@@ -128,11 +128,17 @@ git push origin master
 
 4. Click **Apply**. Render clones the repo and runs the build command:
    ```
-   corepack enable && pnpm install --frozen-lockfile && pnpm --filter @riko/web build && pnpm --filter @riko/db exec tsx src/migrate.ts
+   pnpm install --frozen-lockfile && pnpm --filter @riko/web build && pnpm --filter @riko/db exec tsx src/migrate.ts
    ```
    This installs the whole workspace, builds the dashboard's static assets,
    then applies every pending migration against `DATABASE_URL`. Expect this
    first build to take 3–5 minutes.
+
+   Do **not** prepend `corepack enable` to this command. Render's current
+   images ship pnpm preinstalled and mount `/usr/bin` read-only, so
+   `corepack enable` fails the whole build with `EROFS: read-only file
+   system`. The `packageManager` field in the root `package.json` pins the
+   version without it.
 5. Once live, Render assigns a URL like `https://riko-a1b2.onrender.com`.
    **The first deploy will not work yet** — continue to step 5 before testing.
 
@@ -171,30 +177,34 @@ environment — check the Environment tab. Without it, cases will sit in `NEW`
 forever; nothing is actually broken, the loop that moves them just never
 starts.
 
-Then open `https://riko-a1b2.onrender.com` in a browser, sign up, and create
-an organization. This is the tenant everything else attaches to.
+Then open `https://riko-a1b2.onrender.com` in a browser and sign up. Riko
+creates your workspace automatically and a three-step onboarding modal walks
+you through connecting Razorpay, setting up mail delivery, and meeting your
+agent — all skippable, all editable later under Settings.
 
 ## 7. Keep the free service awake
 
 A free Render web service sleeps after 15 minutes of no HTTP traffic and takes
-roughly 50 seconds to wake on the next request. Two consequences:
+2–3 minutes to wake on the next request (the boot transpiles the workspace
+through tsx on a CPU-throttled instance). Two consequences:
 
 - A Razorpay webhook that arrives while asleep may time out before the service
   wakes, and Razorpay's retry window is short. **This will silently lose a
   demo** if you don't account for it.
 - The dashboard itself will feel broken on first load after idle.
 
-Fix it with any free scheduler hitting `/health` every 10 minutes:
+The repo ships its own fix: `apps/keepalive-worker`, a tiny Cloudflare Cron
+Worker that pings `/health` every 5 minutes — well inside the idle window, so
+the service simply never sleeps.
 
-- [cron-job.org](https://cron-job.org) — free account, one job, no code
-- Or a second, tiny Cloudflare Worker on a Cron Trigger:
-  ```js
-  export default {
-    async scheduled(_event, env) {
-      await fetch("https://riko-a1b2.onrender.com/health");
-    },
-  };
-  ```
+```bash
+pnpm --filter @riko/keepalive-worker exec wrangler login
+pnpm --filter @riko/keepalive-worker exec wrangler deploy
+```
+
+Set the `HEALTH_URL` var in `apps/keepalive-worker/wrangler.toml` if your URL
+differs from the default. Any external pinger (cron-job.org, UptimeRobot)
+hitting `/health` on an interval under 15 minutes works just as well.
 
 Do this **before** connecting Razorpay, or your first test webhook is the one
 that gets lost to a cold start.
@@ -206,8 +216,9 @@ telling Razorpay about Riko's webhook URL. The order matters — Riko needs to
 exist first, because the webhook secret it generates has to match what you
 type into Razorpay.
 
-**8a. Add the connection in Riko.** Dashboard → Connections → Connect Razorpay.
-This calls `POST /api/connections/razorpay`, which encrypts and stores your
+**8a. Add the connection in Riko.** Dashboard → Providers → Connect Razorpay —
+or just the onboarding modal from step 6. This calls
+`POST /api/connections/razorpay`, which encrypts and stores your
 key ID, key secret, and a webhook secret you choose — nothing round-trips to
 Razorpay for verification the way the Stripe connection does.
 
@@ -238,14 +249,18 @@ Expect `HTTP 200 {"status":"processed","caseId":"..."}`. Watch the case move
 through the dashboard: `NEW → DRAFTING → SENDING → WAITING`, roughly 15–30
 seconds end to end at the default poll interval.
 
-## 9. Set up sender identity (SMTP)
+## 9. Set up mail delivery (identity + SMTP)
 
-Recovery emails send through whatever SMTP credentials you configure in
-Settings → Sender Identity — Resend, Gmail with an app password, or any SMTP
-provider works, since `apps/worker/src/lib/mailer.ts` is a plain nodemailer
-transport. Without this configured, `evaluateGates` rejects every case with
+Recovery emails send through whatever SMTP credentials you configure under
+Settings → Connectors → Mail service — Resend, Gmail with an app password, or
+any SMTP provider works, since `apps/worker/src/lib/mailer.ts` is a plain
+nodemailer transport. The onboarding modal from step 6 covers the same fields.
+Without this configured, `evaluateGates` rejects every case with
 `no_verified_sender` and nothing sends, by design — Riko will not draft mail
 it cannot deliver.
+
+Your sender identity — name, email, phone, postal address — lives separately
+under Settings → Identity, and appears in outreach and its footer.
 
 Set a real **Reply-To** here too; this is the address `taggedReplyTo` appends
 `+<case-id>` to before every send, which is how section 10 routes replies back
@@ -365,11 +380,11 @@ regardless of what precedes the `+`.
 
 ### 10g. Point the sender identity's Reply-To at the domain
 
-In the Riko dashboard: Settings → Sender Identity → Reply-To, set it to the
-**untagged** base address on the domain you just configured, e.g.
-`billing@yourdomain.com`. Riko appends `+<case-id>` itself before every send
-(`taggedReplyTo` in `packages/core/src/inbound/address-tag.ts`) — do not
-include a tag here.
+Set the **untagged** base address on the domain you just configured as the
+shared `INBOUND_REPLY_BASE` env var on Render (e.g. `billing@yourdomain.com`),
+or per-tenant via the sender identity's `reply_to`. Riko appends
+`+<case-id>` itself before every send (`taggedReplyTo` in
+`packages/core/src/inbound/address-tag.ts`) — do not include a tag here.
 
 ### 10h. Verify the wiring end to end
 
@@ -433,10 +448,9 @@ Everything above is free at hackathon scale:
 |---|---|---|
 | Render web service | Free | $0 |
 | Neon Postgres | Free (0.5 GB) | $0 |
-| Cloudflare Workers | Free (100k req/day) | $0 |
+| Cloudflare Workers (email + keepalive) | Free (100k req/day) | $0 |
 | Cloudflare Email Routing | Free | $0 |
 | NVIDIA NIM | Free tier | $0 |
-| cron-job.org keepalive | Free | $0 |
 
 The only paid dependency is Razorpay itself in live mode, and test mode (used
 throughout this guide) is free.
@@ -471,7 +485,7 @@ step 8b.
 is missing on boot — see step 6.
 
 **Every case gets stuck before sending, closed with `no_verified_sender`.**
-Sender identity isn't configured — see step 9.
+Mail service isn't configured — Settings → Connectors → Mail service (step 9).
 
 **A demo webhook silently never arrived.** The service was asleep and
 Razorpay's delivery timed out before the 50-second cold start finished — see
@@ -521,7 +535,7 @@ above. All optional ones have safe defaults for a demo.
 | Variable | Required | Default | Effect |
 |---|---|---|---|
 | `INBOUND_REPLY_BASE` | For replies | none | Shared base reply address, e.g. `billing@reply.example.com`. Riko appends the per-case tag. Without it, mail carries no `Reply-To` and replies are unroutable. A tenant's own `reply_to` overrides it. |
-| `HOLDOUT_PERCENT` | No | `5` | % of cases held back as the uncontacted control group |
+| `HOLDOUT_PERCENT` | No | `5` | % of cases held back as the uncontacted control group — for tenants without their own setting; each merchant's Settings → Agent holdout overrides it |
 | `DEFAULT_CUSTOMER_TIMEZONE` | No | `Asia/Kolkata` | Fallback when a customer has no stored timezone. The first email in a case sends any time; follow-ups hold to 7:00–23:00 customer-local. |
 | `UNSUBSCRIBE_RATE_LIMIT` | No | `0.1` | Opt-out rate per send that trips the circuit breaker |
 | `PAY_LINK_RATE_LIMIT` | No | `30` | Payment-link resolutions per minute before 429s |

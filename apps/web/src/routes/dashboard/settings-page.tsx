@@ -1,11 +1,21 @@
 import { useEffect, useState } from "react";
+import { CaretRightIcon, EnvelopeSimpleIcon, PhoneIcon, WhatsappLogo } from "@phosphor-icons/react";
 import {
   BRAND_TEMPLATE_DARK_CSS,
   BRAND_TEMPLATE_LIGHT_CSS,
   CONTENT_PLACEHOLDER,
   DEFAULT_BRAND_TEMPLATE,
 } from "@riko/core/outreach/brand-template";
+import { Badge } from "../../components/ui/badge.js";
 import { Button } from "../../components/ui/button.js";
+import { Card, CardContent, CardHeader } from "../../components/ui/card.js";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "../../components/ui/dialog.js";
 import { Select } from "../../components/ui/select.js";
 import { Skeleton } from "../../components/ui/skeleton.js";
 import { Switch } from "../../components/ui/switch.js";
@@ -126,12 +136,11 @@ function buildPreview(template: string, merchantName: string, resolvedTheme: Res
 }
 
 const SECTIONS = [
-  { id: "sender-identity", label: "Sender identity" },
+  { id: "sender-identity", label: "Identity" },
+  { id: "connectors", label: "Connectors" },
   { id: "agent", label: "Agent" },
-  { id: "smtp", label: "SMTP" },
   { id: "brand-template", label: "Brand template" },
   { id: "alerts", label: "Alerts" },
-  { id: "send-window", label: "Send window" },
   { id: "pause-outreach", label: "Pause outreach" },
 ];
 
@@ -175,6 +184,7 @@ export function SettingsPage() {
 
   const [fromName, setFromName] = useState("");
   const [fromEmail, setFromEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [smtpHost, setSmtpHost] = useState("");
   const [smtpPort, setSmtpPort] = useState("587");
   const [smtpSecure, setSmtpSecure] = useState(false);
@@ -190,6 +200,7 @@ export function SettingsPage() {
   const [agentForm, setAgentForm] = useState<AgentForm | null>(null);
   const [agentError, setAgentError] = useState<string | null>(null);
   const [agentSaved, setAgentSaved] = useState(false);
+  const [sendingModalOpen, setSendingModalOpen] = useState(false);
 
   useEffect(() => {
     if (!agentData) return;
@@ -218,6 +229,7 @@ export function SettingsPage() {
     if (!identity) return;
     setFromName(identity.fromName);
     setFromEmail(identity.fromEmail);
+    setPhone(identity.phone ?? "");
     setSmtpHost(identity.smtpHost ?? "");
     setSmtpPort(identity.smtpPort ? String(identity.smtpPort) : "587");
     setSmtpSecure(identity.smtpSecure);
@@ -230,32 +242,40 @@ export function SettingsPage() {
 
   const smtpPasswordAlreadySet = data?.senderIdentity?.smtpPasswordSet ?? false;
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setError(null);
-    setSaved(false);
-
-    if (!smtpPassword && !smtpPasswordAlreadySet) {
+  const persistSending = async (includeSmtp: boolean): Promise<boolean> => {
+    if (includeSmtp && !smtpPassword && !smtpPasswordAlreadySet) {
       setError("SMTP password is required the first time you configure sending.");
-      return;
+      return false;
     }
 
     try {
       await save.mutateAsync({
         fromName,
         fromEmail,
-        smtpHost,
-        smtpPort: Number(smtpPort),
-        smtpSecure,
-        smtpUser,
-        smtpPassword: smtpPassword || undefined,
+        phone: phone || undefined,
+        smtpHost: includeSmtp ? smtpHost : undefined,
+        smtpPort: includeSmtp ? Number(smtpPort) : undefined,
+        smtpSecure: includeSmtp ? smtpSecure : undefined,
+        smtpUser: includeSmtp ? smtpUser : undefined,
+        smtpPassword: includeSmtp ? smtpPassword || undefined : undefined,
         brandTemplateHtml: brandTemplateHtml || undefined,
         addressLine: addressLine || undefined,
         alertWebhookUrl: alertWebhookUrl || undefined,
-      });      setSmtpPassword("");
-      setSaved(true);
+      });
+      setSmtpPassword("");
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save settings.");
+      return false;
+    }
+  };
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError(null);
+    setSaved(false);
+    if (await persistSending(false)) {
+      setSaved(true);
     }
   };
 
@@ -271,7 +291,6 @@ export function SettingsPage() {
 
   const isFormSection =
     activeSection === "sender-identity" ||
-    activeSection === "smtp" ||
     activeSection === "brand-template" ||
     activeSection === "alerts";
 
@@ -316,36 +335,52 @@ export function SettingsPage() {
           </ul>
         </nav>
 
-        <div className="max-w-2xl">
+        <div className={cn("max-w-2xl", activeSection === "connectors" && "max-w-none")}>
           {isFormSection ? (
             <form onSubmit={handleSubmit}>
               {activeSection === "sender-identity" ? (
                 <section>
-                  <h2 className="text-subtitle text-ink">Sender identity</h2>
-                  <p className="mt-1 text-sm text-ink-muted">Outreach is sent from your domain, not from Riko.</p>
+                  <h2 className="text-subtitle text-ink">Identity</h2>
+                  <p className="mt-1 text-sm text-ink-muted">
+                    How you appear to customers and to us. Mail delivery itself is configured under Connectors →
+                    Mail service.
+                  </p>
                   <div className="mt-4 space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className="block text-sm">
+                        <span className="text-label uppercase text-ink-muted">Sender name</span>
+                        <input
+                          type="text"
+                          placeholder="Acme Inc"
+                          required
+                          autoComplete="off"
+                          className={inputClass}
+                          value={fromName}
+                          onChange={(e) => setFromName(e.target.value)}
+                        />
+                      </label>
+                      <label className="block text-sm">
+                        <span className="text-label uppercase text-ink-muted">Sender email</span>
+                        <input
+                          type="email"
+                          placeholder="billing@acme.com"
+                          required
+                          autoComplete="off"
+                          className={inputClass}
+                          value={fromEmail}
+                          onChange={(e) => setFromEmail(e.target.value)}
+                        />
+                      </label>
+                    </div>
                     <label className="block text-sm">
-                      <span className="text-label uppercase text-ink-muted">From name</span>
+                      <span className="text-label uppercase text-ink-muted">Phone number</span>
                       <input
-                        type="text"
-                        placeholder="Acme Inc"
-                        required
+                        type="tel"
+                        placeholder="+91 98765 43210"
                         autoComplete="off"
                         className={inputClass}
-                        value={fromName}
-                        onChange={(e) => setFromName(e.target.value)}
-                      />
-                    </label>
-                    <label className="block text-sm">
-                      <span className="text-label uppercase text-ink-muted">From email</span>
-                      <input
-                        type="email"
-                        placeholder="billing@acme.com"
-                        required
-                        autoComplete="off"
-                        className={inputClass}
-                        value={fromEmail}
-                        onChange={(e) => setFromEmail(e.target.value)}
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
                       />
                     </label>
                     <label className="block text-sm">
@@ -357,74 +392,6 @@ export function SettingsPage() {
                         className={inputClass}
                         value={addressLine}
                         onChange={(e) => setAddressLine(e.target.value)}
-                      />
-                    </label>
-                  </div>
-                </section>
-              ) : null}
-
-              {activeSection === "smtp" ? (
-                <section>
-                  <h2 className="text-subtitle text-ink">SMTP</h2>
-                  <p className="mt-1 text-sm text-ink-muted">
-                    Your own mail server or provider credentials. Riko never sends through a shared account —
-                    without these, outreach for your cases stays gated and nothing is sent.
-                  </p>
-                  <div className="mt-4 grid grid-cols-2 gap-3">
-                    <label className="col-span-2 block text-sm">
-                      <span className="text-label uppercase text-ink-muted">Host</span>
-                      <input
-                        type="text"
-                        placeholder="smtp.yourdomain.com"
-                        required
-                        autoComplete="off"
-                        className={inputClass}
-                        value={smtpHost}
-                        onChange={(e) => setSmtpHost(e.target.value)}
-                      />
-                    </label>
-                    <label className="block text-sm">
-                      <span className="text-label uppercase text-ink-muted">Port</span>
-                      <input
-                        type="number"
-                        required
-                        autoComplete="off"
-                        className={inputClass}
-                        value={smtpPort}
-                        onChange={(e) => setSmtpPort(e.target.value)}
-                      />
-                    </label>
-                    <label className="flex items-end gap-2 pb-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={smtpSecure}
-                        onChange={(e) => setSmtpSecure(e.target.checked)}
-                        className="h-4 w-4 rounded border-line-strong"
-                      />
-                      <span className="text-ink-muted">Use TLS</span>
-                    </label>
-                    <label className="block text-sm">
-                      <span className="text-label uppercase text-ink-muted">Username</span>
-                      <input
-                        type="text"
-                        required
-                        autoComplete="off"
-                        className={inputClass}
-                        value={smtpUser}
-                        onChange={(e) => setSmtpUser(e.target.value)}
-                      />
-                    </label>
-                    <label className="block text-sm">
-                      <span className="text-label uppercase text-ink-muted">
-                        Password{smtpPasswordAlreadySet ? " (leave blank to keep current)" : ""}
-                      </span>
-                      <input
-                        type="password"
-                        placeholder={smtpPasswordAlreadySet ? "••••••••" : ""}
-                        autoComplete="new-password"
-                        className={inputClass}
-                        value={smtpPassword}
-                        onChange={(e) => setSmtpPassword(e.target.value)}
                       />
                     </label>
                   </div>
@@ -522,47 +489,6 @@ export function SettingsPage() {
             </form>
           ) : null}
 
-          {activeSection === "send-window" ? (
-            <section>
-              <h2 className="text-subtitle text-ink">Sending limits</h2>
-              <p className="mt-1 text-sm text-ink-muted">
-                The first email in a case goes out whenever it comes due. Follow-ups hold to 7:00–23:00 in the
-                customer's own timezone. No more than this many emails leave your account per day.
-              </p>
-              <div className="mt-4 max-w-xs">
-                <label className="block text-sm">
-                  <span className="text-label uppercase text-ink-muted">Daily send cap</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={10000}
-                    required
-                    className={inputClass}
-                    value={dailySendCap}
-                    onChange={(e) => setDailySendCap(e.target.value)}
-                  />
-                </label>
-                <Button
-                  type="button"
-                  size="sm"
-                  className="mt-3"
-                  disabled={saveCap.isPending}
-                  onClick={async () => {
-                    setError(null);
-                    try {
-                      await saveCap.mutateAsync({ dailySendCap: Number(dailySendCap) });
-                      setSaved(true);
-                    } catch (err) {
-                      setError(err instanceof Error ? err.message : "Could not save.");
-                    }
-                  }}
-                >
-                  {saveCap.isPending ? "Saving…" : "Save cap"}
-                </Button>
-              </div>
-            </section>
-          ) : null}
-
           {activeSection === "pause-outreach" ? (
             <section>
               <div className="flex items-center justify-between">
@@ -588,6 +514,68 @@ export function SettingsPage() {
                 />
               </div>
             </section>
+          ) : null}
+
+          {activeSection === "connectors" ? (
+            <div>
+              <h2 className="text-subtitle text-ink">Connectors</h2>
+              <p className="mt-1 max-w-lg text-sm text-ink-muted">
+                The channels Riko can reach your customers on. More connectors are on the way.
+              </p>
+              <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
+                <button type="button" onClick={() => setSendingModalOpen(true)} className="text-left">
+                  <Card className="h-full transition-colors duration-150 hover:border-line-strong">
+                    <CardHeader className="flex flex-row items-center justify-between border-b border-line">
+                      <span className="flex items-center gap-2.5">
+                        <EnvelopeSimpleIcon size={18} weight="regular" className="text-ink-muted" />
+                        <span className="text-sm font-medium text-ink">Mail service</span>
+                      </span>
+                      {identity?.smtpHost ? (
+                        <Badge variant="recovered">Configured</Badge>
+                      ) : (
+                        <Badge variant="waiting">Not configured</Badge>
+                      )}
+                    </CardHeader>
+                    <CardContent className="flex items-end justify-between pt-4">
+                      <p className="text-caption text-ink-muted">
+                        Your own domain and mail server. Outreach is sent from your address, never ours.
+                      </p>
+                      <CaretRightIcon size={14} weight="bold" className="ml-2 shrink-0 text-ink-faint" />
+                    </CardContent>
+                  </Card>
+                </button>
+
+                <Card className="h-full opacity-60">
+                  <CardHeader className="flex flex-row items-center justify-between border-b border-line">
+                    <span className="flex items-center gap-2.5">
+                      <WhatsappLogo size={18} weight="regular" className="text-ink-muted" />
+                      <span className="text-sm font-medium text-ink">WhatsApp</span>
+                    </span>
+                    <Badge variant="default">Coming soon</Badge>
+                  </CardHeader>
+                  <CardContent className="pt-4">
+                    <p className="text-caption text-ink-muted">
+                      Recovery nudges where your customers actually reply. Same agent, same guardrails.
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="h-full opacity-60">
+                  <CardHeader className="flex flex-row items-center justify-between border-b border-line">
+                    <span className="flex items-center gap-2.5">
+                      <PhoneIcon size={18} weight="regular" className="text-ink-muted" />
+                      <span className="text-sm font-medium text-ink">Call</span>
+                    </span>
+                    <Badge variant="default">Coming soon</Badge>
+                  </CardHeader>
+                  <CardContent className="pt-4">
+                    <p className="text-caption text-ink-muted">
+                      A polite automated call for high-value cases that have ignored every email.
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
           ) : null}
 
           {activeSection === "agent" && agentForm ? (
@@ -626,6 +614,27 @@ export function SettingsPage() {
                     <input type="number" min={1} max={120} className={inputClass} value={agentForm.ageReceivable}
                       onChange={(e) => setAgentForm({ ...agentForm, ageReceivable: e.target.value })} />
                   </label>
+                </div>
+              </section>
+
+              <section className="mt-8">
+                <h3 className="text-label uppercase text-ink-muted">Sending limits</h3>
+                <div className="mt-3 max-w-xs">
+                  <label className="block text-sm">
+                    <span className="text-label uppercase text-ink-muted">Daily send cap (emails per day)</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={10000}
+                      required
+                      className={inputClass}
+                      value={dailySendCap}
+                      onChange={(e) => setDailySendCap(e.target.value)}
+                    />
+                  </label>
+                  <p className="mt-2 text-caption text-ink-faint">
+                    No more than this many emails leave your account per day, across all cases.
+                  </p>
                 </div>
               </section>
 
@@ -783,23 +792,26 @@ export function SettingsPage() {
                     setAgentError(null);
                     setAgentSaved(false);
                     try {
-                      await saveAgent.mutateAsync({
-                        maxAttempts: Number(agentForm.maxAttempts),
-                        cooldownHours: Number(agentForm.cooldownHours),
-                        contactWindowStartHour: Number(agentForm.windowStart),
-                        contactWindowEndHour: Number(agentForm.windowEnd),
-                        firstEmailWithinWindow: agentForm.firstEmailWithinWindow,
-                        maxAgeDaysPaymentFailure: Number(agentForm.agePayment),
-                        maxAgeDaysCheckoutAbandonment: Number(agentForm.ageAbandonment),
-                        maxAgeDaysOverdueReceivable: Number(agentForm.ageReceivable),
-                        minAmountMinor: Math.round(Number(agentForm.minAmount) * 100),
-                        highValueThresholdMinor: Math.round(Number(agentForm.highValue) * 100),
-                        holdoutPercent: Number(agentForm.holdout),
-                        defaultLanguage: agentForm.defaultLanguage,
-                        tone: agentForm.tone,
-                        persistence: agentForm.persistence,
-                        additionalInstructions: agentForm.additionalInstructions,
-                      });
+                      await Promise.all([
+                        saveAgent.mutateAsync({
+                          maxAttempts: Number(agentForm.maxAttempts),
+                          cooldownHours: Number(agentForm.cooldownHours),
+                          contactWindowStartHour: Number(agentForm.windowStart),
+                          contactWindowEndHour: Number(agentForm.windowEnd),
+                          firstEmailWithinWindow: agentForm.firstEmailWithinWindow,
+                          maxAgeDaysPaymentFailure: Number(agentForm.agePayment),
+                          maxAgeDaysCheckoutAbandonment: Number(agentForm.ageAbandonment),
+                          maxAgeDaysOverdueReceivable: Number(agentForm.ageReceivable),
+                          minAmountMinor: Math.round(Number(agentForm.minAmount) * 100),
+                          highValueThresholdMinor: Math.round(Number(agentForm.highValue) * 100),
+                          holdoutPercent: Number(agentForm.holdout),
+                          defaultLanguage: agentForm.defaultLanguage,
+                          tone: agentForm.tone,
+                          persistence: agentForm.persistence,
+                          additionalInstructions: agentForm.additionalInstructions,
+                        }),
+                        saveCap.mutateAsync({ dailySendCap: Number(dailySendCap) || 500 }),
+                      ]);
                       setAgentSaved(true);
                     } catch (err) {
                       setAgentError(err instanceof Error ? err.message : "Could not save agent settings.");
@@ -813,6 +825,112 @@ export function SettingsPage() {
           ) : null}
         </div>
       </div>
+
+      <Dialog
+        open={sendingModalOpen}
+        onOpenChange={(next) => {
+          setSendingModalOpen(next);
+          if (next) {
+            setError(null);
+            setSaved(false);
+          }
+        }}
+      >
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Mail service</DialogTitle>
+            <DialogDescription>
+              Outreach is sent from your domain through your own mail server. Riko never sends from a shared account.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form
+            className="space-y-3"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              setError(null);
+              if (await persistSending(true)) {
+                setSendingModalOpen(false);
+                setSaved(true);
+              }
+            }}
+          >
+            <div className="grid grid-cols-2 gap-3">
+              <label className="col-span-2 block text-sm">
+                <span className="text-label uppercase text-ink-muted">SMTP host</span>
+                <input
+                  type="text"
+                  placeholder="smtp.yourdomain.com"
+                  required
+                  autoComplete="off"
+                  className={inputClass}
+                  value={smtpHost}
+                  onChange={(e) => setSmtpHost(e.target.value)}
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="text-label uppercase text-ink-muted">Port</span>
+                <input
+                  type="number"
+                  required
+                  autoComplete="off"
+                  className={inputClass}
+                  value={smtpPort}
+                  onChange={(e) => setSmtpPort(e.target.value)}
+                />
+              </label>
+              <label className="flex items-end gap-2 pb-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={smtpSecure}
+                  onChange={(e) => setSmtpSecure(e.target.checked)}
+                  className="h-4 w-4 rounded border-line-strong"
+                />
+                <span className="text-ink-muted">Use TLS</span>
+              </label>
+              <label className="block text-sm">
+                <span className="text-label uppercase text-ink-muted">Username</span>
+                <input
+                  type="text"
+                  required
+                  autoComplete="off"
+                  className={inputClass}
+                  value={smtpUser}
+                  onChange={(e) => setSmtpUser(e.target.value)}
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="text-label uppercase text-ink-muted">
+                  Password{smtpPasswordAlreadySet ? " (leave blank to keep current)" : ""}
+                </span>
+                <input
+                  type="password"
+                  placeholder={smtpPasswordAlreadySet ? "••••••••" : ""}
+                  autoComplete="new-password"
+                  className={inputClass}
+                  value={smtpPassword}
+                  onChange={(e) => setSmtpPassword(e.target.value)}
+                />
+              </label>
+            </div>
+
+            {error ? (
+              <p className="rounded-sm border border-lost/30 bg-lost/10 px-3 py-2 text-sm text-lost" role="alert">
+                {error}
+              </p>
+            ) : null}
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <Button type="button" variant="ghost" onClick={() => setSendingModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={save.isPending}>
+                {save.isPending ? "Saving…" : "Save mail service"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

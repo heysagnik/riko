@@ -30,12 +30,13 @@ import { TooltipProvider } from "../../components/ui/tooltip.js";
 import { cn } from "../../lib/utils.js";
 import { authClient } from "../../lib/auth-client.js";
 import { useTheme } from "../../lib/theme.js";
+import { OnboardingModal } from "./onboarding-modal.js";
 
 const navItems = [
   { to: "/dashboard", label: "Overview", end: true, icon: HouseIcon },
   { to: "/dashboard/cases", label: "Cases", end: false, icon: ListChecksIcon },
   { to: "/dashboard/exceptions", label: "Exceptions", end: false, icon: WarningIcon },
-  { to: "/dashboard/connections", label: "Connections", end: false, icon: PlugIcon },
+  { to: "/dashboard/connections", label: "Providers", end: false, icon: PlugIcon },
   { to: "/dashboard/settings", label: "Settings", end: false, icon: GearIcon },
 ];
 
@@ -262,6 +263,8 @@ export function DashboardLayout() {
           </div>
         </div>
       </main>
+
+      <OnboardingModal />
     </div>
   );
 }
