@@ -11,7 +11,7 @@ export interface SmtpConfig {
 const transporterCache = new Map<string, Transporter>();
 
 function cacheKey(config: SmtpConfig): string {
-  return `${config.host}:${config.port}:${config.user}`;
+  return `${config.host}:${config.port}:${config.secure ? "tls" : "starttls"}:${config.user}:${config.password.slice(0, 8)}`;
 }
 
 export function getTransporterForSmtpConfig(config: SmtpConfig): Transporter {
