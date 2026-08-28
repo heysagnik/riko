@@ -1,5 +1,4 @@
 import { and, eq, isNull, lte, or } from "drizzle-orm";
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { db, cases, customers, senderIdentities, appendCaseEvent, agentActions } from "@riko/db";
 import { evaluateGates, applyTransition, routeIntervention, type GateCaseInput } from "@riko/core";
 import { reasonPaymentCase, type ReasonPaymentCaseInput } from "@riko/agent";
@@ -8,6 +7,7 @@ import { loadReasonCaseInput as defaultLoadReasonCaseInput } from "../loaders/lo
 import { llmRateLimiter } from "../lib/rate-limiter.js";
 import { alert, log } from "../lib/logger.js";
 import { nextContactWindowOpen } from "../lib/local-day.js";
+import { llmConfig, llmChatModel } from "../lib/llm.js";
 
 export interface ProcessNewCasesDeps {
   loadGateInput: (caseId: string) => Promise<GateCaseInput>;
@@ -21,13 +21,7 @@ const DEFER_MINUTES = 60;
 
 const TRANSIENT_GATE_REASONS = new Set(["outside_contact_window", "tenant_paused_or_capped", "cooldown_not_elapsed"]);
 
-const nim = createOpenAICompatible({
-  name: "nvidia-nim",
-  baseURL: process.env.NVIDIA_NIM_BASE_URL ?? "https://integrate.api.nvidia.com/v1",
-  apiKey: process.env.NVIDIA_API_KEY ?? "",
-});
-const MODEL = process.env.NVIDIA_NIM_MODEL ?? "meta/llama-3.1-8b-instruct";
-const model = nim.chatModel(MODEL);
+const { model: MODEL } = llmConfig();
 
 async function alertWebhookFor(tenantId: string): Promise<string | null> {
   const [row] = await db
@@ -164,7 +158,7 @@ export async function processNewCases({
         const reasonInput = await loadReasonCaseInput(caseRow.id, now);
         await llmRateLimiter.acquire();
         const startMs = Date.now();
-        const reasoning = await reasonPaymentCase(model, reasonInput);
+        const reasoning = await reasonPaymentCase(llmChatModel(), reasonInput);
         const latencyMs = Date.now() - startMs;
 
         await db.insert(agentActions).values({

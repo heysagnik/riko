@@ -1,18 +1,12 @@
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { db, cases, agentActions, outreach, appendCaseEvent } from "@riko/db";
 import { runDraftLoop } from "@riko/agent";
 import type { CaseFacts } from "@riko/shared";
 import { llmRateLimiter } from "../lib/rate-limiter.js";
 import { log } from "../lib/logger.js";
+import { llmConfig, llmChatModel } from "../lib/llm.js";
 
-const nim = createOpenAICompatible({
-  name: "nvidia-nim",
-  baseURL: process.env.NVIDIA_NIM_BASE_URL ?? "https://integrate.api.nvidia.com/v1",
-  apiKey: process.env.NVIDIA_API_KEY ?? "",
-});
-const MODEL = process.env.NVIDIA_NIM_MODEL ?? "meta/llama-3.1-8b-instruct";
-const model = nim.chatModel(MODEL);
+const { model: MODEL } = llmConfig();
 
 const MIN_LEAD_MS = 15 * 60 * 1000;
 const MAX_LEAD_MS = 48 * 60 * 60 * 1000;
@@ -44,7 +38,7 @@ export async function processScheduledDrafts(
       const facts = await loadFacts(caseRow.id);
 
       await llmRateLimiter.acquire();
-      const outcome = await runDraftLoop(model, MODEL, caseRow.id, facts, async (entry) => {
+      const outcome = await runDraftLoop(llmChatModel(), MODEL, caseRow.id, facts, async (entry) => {
         await db.insert(agentActions).values({
           tenantId: caseRow.tenantId,
           caseId: caseRow.id,

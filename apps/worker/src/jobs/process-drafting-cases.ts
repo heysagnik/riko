@@ -1,11 +1,11 @@
 import { and, eq, isNull } from "drizzle-orm";
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { db, cases, agentActions, outreach, senderIdentities, appendCaseEvent } from "@riko/db";
 import { applyTransition } from "@riko/core";
 import { runDraftLoop } from "@riko/agent";
 import type { CaseFacts } from "@riko/shared";
 import { llmRateLimiter } from "../lib/rate-limiter.js";
 import { log, alert } from "../lib/logger.js";
+import { llmConfig, llmChatModel } from "../lib/llm.js";
 
 const DRAFT_FRESH_MS = 12 * 60 * 60 * 1000;
 const BATCH_LIMIT = 200;
@@ -19,13 +19,7 @@ async function alertWebhookFor(tenantId: string): Promise<string | null> {
   return row?.url ?? null;
 }
 
-const nim = createOpenAICompatible({
-  name: "nvidia-nim",
-  baseURL: process.env.NVIDIA_NIM_BASE_URL ?? "https://integrate.api.nvidia.com/v1",
-  apiKey: process.env.NVIDIA_API_KEY ?? "",
-});
-const MODEL = process.env.NVIDIA_NIM_MODEL ?? "meta/llama-3.1-8b-instruct";
-const model = nim.chatModel(MODEL);
+const { model: MODEL } = llmConfig();
 
 export async function processDraftingCases(loadFacts: (caseId: string) => Promise<CaseFacts>): Promise<void> {
   const draftingCases = await db
@@ -78,7 +72,7 @@ export async function processDraftingCases(loadFacts: (caseId: string) => Promis
       const facts = await loadFacts(caseRow.id);
 
       await llmRateLimiter.acquire();
-      const outcome = await runDraftLoop(model, MODEL, caseRow.id, facts, async (entry) => {
+      const outcome = await runDraftLoop(llmChatModel(), MODEL, caseRow.id, facts, async (entry) => {
         await db.insert(agentActions).values({
           tenantId: caseRow.tenantId,
           caseId: caseRow.id,

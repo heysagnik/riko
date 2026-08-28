@@ -19,8 +19,12 @@ services:
         sync: false
       - key: BETTER_AUTH_SECRET
         sync: false
-      - key: NVIDIA_API_KEY
+      - key: LLM_API_KEY
         sync: false
+      - key: LLM_BASE_URL
+        value: https://api.mistral.ai/v1
+      - key: LLM_MODEL
+        value: mistral-small-latest
       - key: INBOUND_MAIL_SECRET
         sync: false
       # Shared reply domain; must match the Email Routing zone.
@@ -33,7 +37,7 @@ services:
         sync: false
       - key: HOLDOUT_PERCENT
         value: "25"
-      - key: NVIDIA_NIM_BASE_URL
+      - key: LLM_BASE_URL
         value: https://api.mistral.ai/v1
-      - key: NVIDIA_NIM_MODEL
+      - key: LLM_MODEL
         value: mistral-small-latest

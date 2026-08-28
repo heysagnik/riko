@@ -50,7 +50,7 @@ piece that lives there.
 - A [Render](https://render.com) account (free tier)
 - A domain added to Cloudflare, with Email Routing available (only needed for
   two-way email — skip section 7 without it)
-- An NVIDIA NIM API key (free tier) for the drafting model
+- A Mistral API key ([console.mistral.ai](https://console.mistral.ai), free tier) for the agent model
 - A Razorpay account in test mode
 
 ## 1. Generate the secrets you'll need
@@ -121,7 +121,7 @@ git push origin master
 | `DATABASE_URL` | The Neon connection string from step 2 |
 | `APP_ENCRYPTION_KEY` | Generated in step 1 |
 | `BETTER_AUTH_SECRET` | Generated in step 1 |
-| `NVIDIA_API_KEY` | [build.nvidia.com](https://build.nvidia.com) → API key |
+| `LLM_API_KEY` | [console.mistral.ai](https://console.mistral.ai) → API key |
 | `INBOUND_MAIL_SECRET` | Generated in step 1 |
 | `BETTER_AUTH_URL` | Leave blank, fill in step 5 |
 | `APP_BASE_URL` | Leave blank, fill in step 5 |
@@ -450,7 +450,7 @@ Everything above is free at hackathon scale:
 | Neon Postgres | Free (0.5 GB) | $0 |
 | Cloudflare Workers (email + keepalive) | Free (100k req/day) | $0 |
 | Cloudflare Email Routing | Free | $0 |
-| NVIDIA NIM | Free tier | $0 |
+| Mistral API | Free tier | $0 |
 
 The only paid dependency is Razorpay itself in live mode, and test mode (used
 throughout this guide) is free.
@@ -541,8 +541,8 @@ above. All optional ones have safe defaults for a demo.
 | `PAY_LINK_RATE_LIMIT` | No | `30` | Payment-link resolutions per minute before 429s |
 | `COST_PER_SEND_MINOR` | No | `0` | Assumed cost per email, for the net-recovered metric |
 | `WORKER_POLL_MS` | No | `15000` | How often the in-process worker loop ticks |
-| `NVIDIA_NIM_MODEL` | No | `meta/llama-3.1-8b-instruct` | Drafting model |
-| `NVIDIA_NIM_BASE_URL` | No | NVIDIA's public endpoint | Override for a self-hosted NIM |
+| `LLM_MODEL` | No | `mistral-small-latest` | Model used for reasoning and drafting |
+| `LLM_BASE_URL` | No | `https://api.mistral.ai/v1` | Any OpenAI-compatible endpoint (Mistral, Groq, Together, …) |
 
 ## Operations runbook
 

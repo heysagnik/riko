@@ -1,19 +1,14 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { db, cases, caseMessages, promises, appendCaseEvent } from "@riko/db";
 import { applyTransition, extractPromise, MIN_PROMISE_CONFIDENCE } from "@riko/core";
 import { reasonReply, validateReply, detectEscalationSignals, type ConversationTurn } from "@riko/agent";
 import { getTransporterForSmtpConfig } from "../lib/mailer.js";
 import { llmRateLimiter, processWithConcurrency, roundRobinByTenant } from "../lib/rate-limiter.js";
 import { log } from "../lib/logger.js";
+import { llmChatModel } from "../lib/llm.js";
 import type { SendableOutreach } from "./process-sending-cases.js";
 
-const nim = createOpenAICompatible({
-  name: "nvidia-nim",
-  baseURL: process.env.NVIDIA_NIM_BASE_URL ?? "https://integrate.api.nvidia.com/v1",
-  apiKey: process.env.NVIDIA_API_KEY ?? "",
-});
-const model = nim.chatModel(process.env.NVIDIA_NIM_MODEL ?? "meta/llama-3.1-8b-instruct");
+const model = llmChatModel();
 
 const MAX_AGENT_REPLIES = Number(process.env.MAX_AGENT_REPLIES ?? 5);
 

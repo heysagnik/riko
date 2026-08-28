@@ -149,7 +149,7 @@ flowchart TD
 
     FACTS["Case Facts & Context\n• Customer Name\n• Exact Amount (e.g. INR 2400.00)\n• Payment / Unsubscribe URLs\n• Failure Reason & Selected Tone Rung"]:::input
     
-    PROMPT["NVIDIA NIM Drafter (Llama 3.1 8B)\nGenerates Structured JSON: { subject, bodyText, bodyHtml }"]:::model
+    PROMPT["Mistral Drafter (mistral-small-latest)\nGenerates Structured JSON: { subject, bodyText, bodyHtml }"]:::model
     
     FACTS --> PROMPT
     PROMPT --> DRAFT["Candidate Draft Output"]:::model

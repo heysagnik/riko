@@ -49,7 +49,7 @@ Riko separates judgment from obedience. A reasoning model decides what to say an
 - Node.js `>= 22.0.0 < 25.0.0`
 - pnpm `^9.15.1`
 - PostgreSQL (Neon recommended)
-- NVIDIA NIM API Key (`meta/llama-3.1-8b-instruct`)
+- A Mistral API key (`mistral-small-latest`) — or any OpenAI-compatible endpoint
 
 ### 1. Install dependencies
 
@@ -79,7 +79,7 @@ Populate the required keys in `.env`:
 DATABASE_URL=postgresql://user:password@host/dbname?sslmode=require
 APP_ENCRYPTION_KEY=...
 BETTER_AUTH_SECRET=...
-NVIDIA_API_KEY=...
+LLM_API_KEY=...
 INBOUND_MAIL_SECRET=...
 ```
 
