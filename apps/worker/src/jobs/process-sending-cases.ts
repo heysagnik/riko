@@ -7,6 +7,17 @@ import { log } from "../lib/logger.js";
 
 const SEND_CLAIM_TTL_MS = 5 * 60 * 1000;
 
+const SMTP_FAILURE_THRESHOLD = 3;
+const SMTP_COOLDOWN_MS = 5 * 60 * 1000;
+const CONNECTION_ERROR = /timeout|timed out|ECONN|EAI_AGAIN|ENOTFOUND|EHOSTUNREACH|ECONNRESET|greeting/i;
+
+let consecutiveSmtpFailures = 0;
+let smtpCooldownUntil = 0;
+
+function isConnectionError(message: string): boolean {
+  return CONNECTION_ERROR.test(message);
+}
+
 export interface SendableOutreach {
   outreachId: string;
   fromEmail: string;
@@ -24,6 +35,10 @@ export interface SendableOutreach {
 export async function processSendingCases(
   loadPendingOutreach: (caseId: string) => Promise<SendableOutreach>,
 ): Promise<void> {
+  if (Date.now() < smtpCooldownUntil) {
+    return;
+  }
+
   const sendingCases = await db
     .select()
     .from(cases)
@@ -71,6 +86,7 @@ export async function processSendingCases(
       if (previewUrl) {
         log.info("smtp_preview_url", { caseId: caseRow.id, previewUrl });
       }
+      consecutiveSmtpFailures = 0;
 
       const transition = applyTransition(caseRow.state, { type: "sent" });
 
@@ -104,6 +120,20 @@ export async function processSendingCases(
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (/No pending outreach|Case not found|Missing customer/.test(message)) continue;
+      if (isConnectionError(message)) {
+        consecutiveSmtpFailures += 1;
+        if (consecutiveSmtpFailures >= SMTP_FAILURE_THRESHOLD) {
+          smtpCooldownUntil = Date.now() + SMTP_COOLDOWN_MS;
+          consecutiveSmtpFailures = 0;
+          log.error("smtp_circuit_open", {
+            caseId: caseRow.id,
+            tenantId: caseRow.tenantId,
+            cooldownMs: SMTP_COOLDOWN_MS,
+            lastError: message,
+          });
+          return;
+        }
+      }
       log.error("send_failed_retry_next_tick", { caseId: caseRow.id, error: message });
     }
   }
