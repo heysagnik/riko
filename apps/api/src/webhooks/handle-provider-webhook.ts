@@ -128,8 +128,14 @@ async function upsertCustomer(
       ),
     )
     .limit(1);
+  if (!existing) throw new Error(`Customer upsert failed for ${event.providerCustomerId}`);
 
-  if (!existing) throw new Error(`Customer insert conflicted but row is missing: ${event.providerCustomerId}`);
+  if (event.providerCustomerName) {
+    await db
+      .update(customers)
+      .set({ name: event.providerCustomerName })
+      .where(eq(customers.id, existing.id));
+  }
   return existing.id;
 }
 
