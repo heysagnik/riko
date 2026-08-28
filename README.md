@@ -4,6 +4,8 @@
 
 Riko separates judgment from obedience. A reasoning model decides what to say and when; a deterministic policy engine decides what is *allowed*. Every draft passes an AST and regex validation barrier before a single email leaves, and every bound the agent runs within is merchant-configurable — enforced in code, not in prompt hope.
 
+<a href="https://riko.sagnik.fun"><img width="1528" height="820" alt="image" src="https://github.com/user-attachments/assets/dcc3ac3a-0f07-425b-8cf9-84b8932a844c" /></a>
+
 ---
 
 ## Highlights
