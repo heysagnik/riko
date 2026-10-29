@@ -67,8 +67,8 @@ importers:
   apps/email-worker:
     dependencies:
       postal-mime:
-        specifier: ^3.0.0
-        version: 3.0.0
+        specifier: ^4.0.8
+        version: 4.0.8
     devDependencies:
       typescript:
         specifier: ^7.0.2
@@ -1826,6 +1826,9 @@ packages:
   '@types/node@26.3.0':
     resolution: {integrity: sha512-L3fgrnchriRC2ExBflb8j4uZZURHZfQsmQeyVzhjcHW4kkwVyo8/0h1B2MVzMTrYUJYu6G7EWs14hW/L9putqw==}
 
+  '@types/node@26.6.6':
+    resolution: {integrity: sha512-MzQj+8Kx3XI40OmUAE6Qoh58ZMNstNNMwn2nfd3qWsfe7nDNSqJNzes4njhz6AHwrSHOffSLwXU6yb474Q4aog==}
+
   '@types/nodemailer@8.0.1':
     resolution: {integrity: sha512-PxpaInm8V1JQDd4j0ds5HfvWQk8JupS1C0Picb96QJsrrRDjBH+DlK7L4ZdNSqNULhiZRQHc40nLVShaGxXAMw==}
 
@@ -2788,6 +2791,9 @@ packages:
   pg-protocol@1.16.0:
     resolution: {integrity: sha512-sILXutLVjCLjcDuOmvhX5e2Z4cS5qG/6Bu3VkpFwdf/633ElGLpEh9bgmuI5I4sqKqkifQiGyiCcx1HdtrK7tg==}
 
+  pg-protocol@1.16.1:
+    resolution: {integrity: sha512-p9VOFMiHB/ZbJATetbg+99PxssTVSQRnyuPSQ67mN1+1KBOjZaZ83ZQzltnxPhJwSsC3nwVjJ10DVJlerbFzLg==}
+
   pg-types@2.2.0:
     resolution: {integrity: sha512-qTAAlrEsl8s4OiEQY69wDvcMIdQN6wdz5ojQiOy6YRMuynxenON0O5oCpJI6lshc6scgAY8qvJ2On/p+CXY0GA==}
     engines: {node: '>=4'}
@@ -2823,8 +2829,9 @@ packages:
     resolution: {integrity: sha512-TfySrs/5nm8fQJDcBDuUng3VOUKsd7S+zqvbOTiGXHfxX4wK31ard+hoNuvkicM/2YFzlpDgABOevKSsB4G/FA==}
     engines: {node: '>= 6'}
 
-  postal-mime@3.0.0:
-    resolution: {integrity: sha512-Z4a9ar2Bv3YpK3IXag+Yda30k7bMZfpRuUGyqtHnZ2pjHG8Bl62EhZIk4n1dzv00gfzP9g+94e9kd8+XmjVWLA==}
+  postal-mime@4.0.8:
+    resolution: {integrity: sha512-nnAgc4a9hn7zYuQmX4C7LU+fN47kR5S8cE8zvB/vZ2NimNDbaj+ISZJ9qe3CKIfn2uOTwwz4nQeIyljvdFNgOA==}
+    engines: {node: '>=20'}
 
   postcss-import@15.1.0:
     resolution: {integrity: sha512-hpr+J05B2FVYUAXHeK1YyI267J/dDDhMU6B6civm8hSY1jYJnBXxzKDKDswzJmtLHryrjhnDjqqp/49t8FALew==}
@@ -3177,6 +3184,9 @@ packages:
 
   undici-types@8.3.0:
     resolution: {integrity: sha512-j375ScV60dom+YkPFIfTLcOiPxkN/buHz5GobjLhixFuANaNs3C9l4GmrWqejgXWJ7BbJcFYpTEUkS1Ge8bpZQ==}
+
+  undici-types@8.9.0:
+    resolution: {integrity: sha512-KTDyRTYX8sWmKXAikPHHSyc63CRPETMctyjKFupcC6OBLXT3xsN0e9aF7m+mIXutFWpUXuedtowG7iLOzp0kQg==}
 
   undici@7.29.0:
     resolution: {integrity: sha512-IDxfleLmmbSskfWSUATiN1nfn2rDuvnMOqb5CWR92iIfojA0Ud+ulOAAEQ57LPr9rWmsreUyf5lwyao+7GNNVw==}
@@ -4417,14 +4427,19 @@ snapshots:
     dependencies:
       undici-types: 8.3.0
 
+  '@types/node@26.6.6':
+    dependencies:
+      undici-types: 8.9.0
+    optional: true
+
   '@types/nodemailer@8.0.1':
     dependencies:
       '@types/node': 26.3.0
 
   '@types/pg@8.11.6':
     dependencies:
-      '@types/node': 26.3.0
-      pg-protocol: 1.16.0
+      '@types/node': 26.6.6
+      pg-protocol: 1.16.1
       pg-types: 4.1.0
     optional: true
 
@@ -5229,6 +5244,9 @@ snapshots:
 
   pg-protocol@1.16.0: {}
 
+  pg-protocol@1.16.1:
+    optional: true
+
   pg-types@2.2.0:
     dependencies:
       pg-int8: 1.0.1
@@ -5270,7 +5288,7 @@ snapshots:
 
   pirates@4.0.7: {}
 
-  postal-mime@3.0.0: {}
+  postal-mime@4.0.8: {}
 
   postcss-import@15.1.0(postcss@8.5.26):
     dependencies:
@@ -5693,6 +5711,9 @@ snapshots:
       '@typescript/typescript-win32-x64': 7.0.2
 
   undici-types@8.3.0: {}
+
+  undici-types@8.9.0:
+    optional: true
 
   undici@7.29.0: {}
 
