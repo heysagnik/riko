@@ -18,7 +18,7 @@
     "@riko/core": "workspace:*",
     "@riko/shared": "workspace:*",
     "ai": "^7.0.79",
-    "zod": "^4.4.3"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@types/node": "^26.3.0",
